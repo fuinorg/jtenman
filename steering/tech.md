@@ -131,10 +131,17 @@ transaction - two rules follow:
 - **Do the failing part first, record afterwards.** `registerTenant` creates the realm and only then
   applies its event: if the realm is not created there is nothing to record, whereas a recorded tenant
   without a realm can never be reached.
-- **State the invariant in the model, not only in the sequence.** `deleteTenant` records the deletion and
-  then removes the aggregate; because those are two calls, every operation also carries a
-  `MustNotBeDeleted` rule. Sequencing makes the normal path right; the rule is what holds when the second
-  call does not happen.
+- **State the invariant in the model, not only in the sequence.** `deleteTenant` removes the realm and
+  records the deletion; what stops a deleted tenant from acting afterwards is the `MustNotBeDeleted` rule
+  every operation carries, not the disappearance of anything. Sequencing makes the normal path right; the
+  rule is what holds when a later call arrives anyway.
+- **A delete command deletes nothing but the external resource.** Never call `repository.delete(..)` or
+  `purge(..)` from a command handler - record the event and `update(..)`, exactly like every other
+  operation. The read model catches up asynchronously, so a stream removed in the same call that appended
+  the deletion event is gone before the projection reads it, and the read model keeps serving the deleted
+  aggregate forever. If streams themselves must go, that is a separate reaper that runs only once every
+  projection has passed the deletion event (`QryProjectionService.updateProjectionPosition` persists the
+  positions it needs) - never the handler.
 
 If the coordination grows past that - several aggregates, retries, compensation - it is a process manager
 with an outbox, and no longer something to solve inside a handler.

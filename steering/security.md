@@ -163,43 +163,44 @@ deliberate steps with a pause in between.
 data itself, and the surviving history of what was provisioned resolves to nobody. Suspending alone does
 *not* achieve that - a disabled realm still holds its users indefinitely.
 
-### delete or purge - and why `deleteTenant` uses delete
+### Deleting a tenant does not delete its stream
 
-ddd4j's `Repository` offers both, and they differ in one way that matters here:
+ddd4j's `Repository` offers two ways to remove an aggregate's stream:
 
 | | Effect on the stream | Realm name afterwards |
 | --- | --- | --- |
-| `Repository.delete(...)` | soft delete | **reusable** |
-| `Repository.purge(...)` | tombstone | **burned forever** |
+| `Repository.delete(...)` | soft delete | retired (`add` is still refused) |
+| `Repository.purge(...)` | tombstone | burned forever |
 
-`purge` exists precisely for erasure, and it is tempting to reach for it here. **`deleteTenant` uses
-`delete`.**
+**`deleteTenant` calls neither.** It records `TenantDeletedEvent` and updates the aggregate, exactly like
+every other operation. The realm - and with it the personal data - is gone from Keycloak; the stream stays.
 
-Be clear about what that does and does not buy, because it is less than it looks. A soft-deleted stream
-still exists, so `Repository.add` with the same identifier is refused - **a realm name is retired once
-its tenant is deleted, either way.** That is verified behaviour, not a guess: re-running the example
-against the same realm answers "A tenant is already registered". `delete` is still the right choice, but
-for the narrower reason that `purge` tombstones the stream and would additionally destroy the
-provisioning history, while gaining nothing in return.
+Deleting the stream in the handler is not merely unnecessary, it is **wrong, and it was a real bug here**.
+The read model is a projection that catches up asynchronously, so a stream deleted in the same call that
+appended the deletion event is gone before the projection ever reads that event. The result was a deleted
+tenant still listed as `ACTIVE` by every application polling `list-by-application` - precisely the state
+this system exists to prevent. The rule is general:
 
-Nothing is lost by choosing `delete`, because **the personal data was never in the stream to begin with**:
-jtenman records only opaque `SubjectId`s, and `removeRealm` deletes the actual data in Keycloak. What the
-soft-deleted stream keeps is the provisioning history - who was registered, subscribed and deleted, and
-when - which is exactly the audit trail you want to survive.
+> **Never remove an aggregate's stream in the command handler that ends its life.** Record the event,
+> update, return. If the streams themselves ever have to go, that is a separate reaper that deletes them
+> only once every projection has passed the deletion event - the positions it needs are already persisted
+> by `QryProjectionService.updateProjectionPosition`.
 
-The handler removes the aggregate as well as recording the event, and **every operation additionally
-carries a `MustNotBeDeleted` rule**. Both, not either:
+Nothing is lost by keeping the stream, because **the personal data was never in it to begin with**:
+jtenman records only opaque `SubjectId`s, and `removeRealm` erased the actual data in Keycloak. What
+remains is the provisioning history - who was registered, subscribed and deleted, and when - which is
+exactly the audit trail you want to survive. `purge` would be the right call where the aggregate itself
+holds the personal data. That is not this aggregate.
 
-- Removing the aggregate is what normally stops a deleted tenant being reached at all.
-- The rule covers the window between the two - recording the deletion and removing the aggregate are
-  separate calls with no shared transaction, so a tenant can outlive its own deletion. Without the rule,
-  the only thing stopping it from acting would be Keycloak answering 404 for a realm that no longer
-  exists: infrastructure accidentally enforcing a domain invariant, and reporting it as a server error.
+What stops a deleted tenant from acting is therefore the model, not the absence of a stream: **every
+operation carries a `MustNotBeDeleted` rule** and a deleted tenant answers `TenantAlreadyDeletedException`
+to all of them. That is where the invariant belongs. Had it been left to stream removal, the only thing
+stopping a deleted tenant would be Keycloak answering 404 for a realm that no longer exists -
+infrastructure accidentally enforcing a domain invariant, and reporting it as a server error.
 
-A deleted tenant therefore answers `TenantAlreadyDeletedException` to everything, whichever of the two
-caught it.
-
-`purge` is the right call where the aggregate itself holds the personal data. That is not this aggregate.
+A realm name is still retired once its tenant is deleted: the stream exists, so `Repository.add` with the
+same identifier is refused. That is verified behaviour, not a guess - re-running the example against the
+same realm answers "A tenant is already registered".
 
 ## Development escape hatches
 

@@ -118,7 +118,7 @@ post_command() {
   payload="$(jq --arg id "$(new_uuid)" --arg ts "$(date -Iseconds)" --arg realm "${REALM}" \
     '.["event-id"] = $id
      | .["event-timestamp"] = $ts
-     | .["entity-id-path"] = "Tenant " + $realm
+     | .["entity-id-path"] = "TENANT " + $realm
      | (if has("realm") then .realm = $realm else . end)' "${file}")"
 
   local http_code body response

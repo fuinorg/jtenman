@@ -50,15 +50,19 @@ public class DeleteTenantCommandHandler implements CommandHandler<DeleteTenantCo
             final Tenant tenant = repository.read(cmd.getAggregateRootId());
             tenant.deleteTenant(cmd.getReason(), service);
             repository.update(tenant);
-            // Record the deletion first, then remove the aggregate. Without this the realm is gone from
-            // Keycloak while the tenant still answers commands, and re-registering the same realm fails
-            // forever with "already registered" against a history nothing can reach.
+            // The aggregate's stream is deliberately NOT deleted here.
             //
-            // delete(), not purge(): the stream id is the realm name, and purge tombstones it so that
-            // name could never be used again - see steering/security.md. The personal data was never in
-            // the stream, only opaque subject ids, so the soft delete erases nothing that matters and
-            // keeps the provisioning history.
-            repository.delete(cmd.getAggregateRootId(), null);
+            // Deleting it immediately after appending TenantDeletedEvent races the projection: the read
+            // model reads the stream asynchronously, so the deletion event would be gone before it was
+            // ever consumed - leaving a deleted tenant listed as ACTIVE for every application polling the
+            // list, which is exactly the state this system exists to prevent.
+            //
+            // Nothing is lost by keeping it. The personal data was never in the stream (only opaque
+            // subject ids); removeRealm erased it in Keycloak, and what remains is the provisioning
+            // history worth auditing. The MustNotBeDeleted rule keeps the aggregate inert.
+            //
+            // If the streams themselves ever have to go, that is a separate reaper that deletes them once
+            // every projection has passed the deletion event - see steering/tech.md - never this handler.
             return SimpleResult.ok();
         } catch (final AggregateNotFoundException | AggregateDeletedException ex) {
             // The tenant is gone. That is an answer the caller can act on, not a server fault.
@@ -69,7 +73,8 @@ public class DeleteTenantCommandHandler implements CommandHandler<DeleteTenantCo
         } catch (TenantNotSuspendedException ex) {
             // A rule the model declares was violated. That is an outcome of the operation, not a failure of
             // it: the caller gets the code and the message rather than a stack trace.
-            return new SimpleResult(ex);        } catch (final Exception ex) {
+            return new SimpleResult(ex);
+        } catch (final Exception ex) {
             // Anything else is infrastructure - the caller cannot act on it.
             throw new CommandExecutionFailedException(ex);
         }

@@ -22,23 +22,26 @@ mvn -pl :jtenman-combined spring-boot:run  # jtenman on 9090                    
 
 Needs `curl` and `jq`. Everything is overridable by environment variable:
 
-| Variable | Default | |
-| --- | --- | --- |
-| `KEYCLOAK_URL` | `http://localhost:8180` | as started by `docker-compose.yml` |
-| `KEYCLOAK_REALM` | `master` | the realm jtenman itself trusts |
-| `KEYCLOAK_CLIENT` | `jtenman-cli` | created by `setup-keycloak.sh` - see below |
-| `REALM` | a fresh random one | the realm the run creates |
-| `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` | `admin` / `admin` | the dev bootstrap account |
-| `JTENMAN_URL` | `http://localhost:9090` | the `combined` deployable |
+| Variable                              | Default                 |                                            |
+|---------------------------------------|-------------------------|--------------------------------------------|
+| `KEYCLOAK_URL`                        | `http://localhost:8180` | as started by `docker-compose.yml`         |
+| `KEYCLOAK_REALM`                      | `master`                | the realm jtenman itself trusts            |
+| `KEYCLOAK_CLIENT`                     | `jtenman-cli`           | created by `setup-keycloak.sh` - see below |
+| `REALM`                               | a fresh random one      | the realm the run creates                  |
+| `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` | `admin` / `admin`       | the dev bootstrap account                  |
+| `JTENMAN_URL`                         | `http://localhost:9090` | the `combined` deployable                  |
 
 ## Step by step, if you would rather do it by hand
 
-**1. Get a token.**
+**1. Get a token** - from `jtenman-cli`, **not** from Keycloak's built-in `admin-cli`. jtenman validates
+the `aud` claim, and only this client emits the `jtenman-api` audience. Run `./setup-keycloak.sh` first if
+it does not exist yet; using `admin-cli` here answers
+`401 ... The aud claim is not valid`.
 
 ```bash
 TOKEN=$(curl -s -X POST \
   http://localhost:8180/realms/master/protocol/openid-connect/token \
-  -d client_id=admin-cli -d username=admin -d password=admin -d grant_type=password \
+  -d client_id=jtenman-cli -d username=admin -d password=admin -d grant_type=password \
   | jq -r .access_token)
 ```
 
@@ -51,12 +54,33 @@ curl -i -X POST http://localhost:9090/cmd/RegisterTenantCommand \
   --data-binary @doc/example/commands/01-register-tenant.json
 ```
 
-**3. Read the tenants of an application** through the query side:
+**3. Subscribe the tenant to an application.** Registering creates the tenant; it does not connect it to
+anything. Until this runs, the tenant belongs to no application and step 4 returns `[]`.
+
+Get a **fresh token first** - the realm was created after your last one was issued, so that token carries
+no rights over it and Keycloak answers 403 (see below):
+
+```bash
+TOKEN=$(curl -s -X POST \
+  http://localhost:8180/realms/master/protocol/openid-connect/token \
+  -d client_id=jtenman-cli -d username=admin -d password=admin -d grant_type=password \
+  | jq -r .access_token)
+
+curl -i -X POST http://localhost:9090/cmd/SubscribeApplicationCommand \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data-binary @doc/example/commands/03-subscribe-application.json
+```
+
+**4. Read the tenants of an application** through the query side. The `application` here is the id from
+the catalogue in `application.yml` - `melkheftken` - not the tenant's realm:
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" \
   'http://localhost:9090/view/tenant/list-by-application?application=melkheftken' | jq .
 ```
+
+The read model is a projection, so allow a few seconds after the subscribe before it appears.
 
 That last call is the contract a consuming application polls, so it is the one worth watching: the tenant
 appears after `subscribeApplication` and disappears again after the unsubscribe, the suspend or the
@@ -67,7 +91,8 @@ delete - each for a different reason.
 They were produced by serialising real command objects with the application's own `ObjectMapper`, so the
 field names are the actual wire format rather than a guess. Two things are easy to get wrong by hand:
 
-- **`entity-id-path`** is `"Tenant acme"` - the entity type, a space, then the realm. Not just the realm.
+- **`entity-id-path`** is `"TENANT acme"` - the entity type, a space, then the realm. Not just the
+  realm, and the type is **upper case**: it is the `EntityType` constant, not the class name.
   `run-example.sh` rewrites it along with `realm`, so a run uses its own realm rather than the one in the
   files.
 - **`event-id`** must be a UUID and must differ per call - each command is a distinct message. The files
@@ -97,7 +122,7 @@ it, and Keycloak's built-in `admin-cli` does not emit the `jtenman-api` audience
 `setup-keycloak.sh` creates: a `jtenman-cli` client with an audience mapper. Without it every call is a
 401, which is the audience check doing its job.
 
-**A realm name is retired once its tenant is deleted.** `deleteTenant` removes the realm and the
-aggregate, but the aggregate's event stream is soft-deleted rather than tombstoned, so registering the
-same realm again is refused with "A tenant is already registered". The script therefore invents a fresh
-realm per run - set `REALM` to pin it.
+**A realm name is retired once its tenant is deleted.** `deleteTenant` removes the realm in Keycloak, but
+the aggregate and its event stream stay - marked deleted, answering every further command with
+`TenantAlreadyDeletedException`. Registering the same realm again is therefore refused with "A tenant is
+already registered". The script invents a fresh realm per run - set `REALM` to pin it.

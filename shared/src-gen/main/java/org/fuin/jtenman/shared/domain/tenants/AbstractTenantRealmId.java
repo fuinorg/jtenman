@@ -16,7 +16,7 @@ public abstract class AbstractTenantRealmId extends AbstractStringValueObject im
     private static final long serialVersionUID = 1000L;
     
     /** Name that identifies the entity uniquely within the context. */    
-    public static final EntityType TYPE = new StringBasedEntityType("Tenant");
+    public static final EntityType TYPE = new StringBasedEntityType("TENANT");
     
     @Override
     public final EntityType getType() {
