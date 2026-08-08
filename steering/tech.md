@@ -50,8 +50,8 @@ The DSL is private: nothing outside jtenman imports the model, so `model` is **n
 - **Security:** Spring Security - OAuth2 Resource Server (JWT) against Keycloak, wired by
   `org.fuin.cqrs4j:cqrs-4-java-springboot-keycloak-starter` - see [security.md](security.md)
 - **Persistence:** Spring Data JPA (Hibernate); Query=H2, Process=PostgreSQL, Command=KurrentDB
-- **Keycloak administration:** `org.keycloak:keycloak-admin-client`, version pinned to the Keycloak
-  version being administered - the admin API is not compatible across majors
+- **Keycloak administration:** `org.keycloak:keycloak-admin-client`, matched to the **major** of the
+  server being administered, not to its exact version - see [security.md](security.md)
 - **Build:** Maven
 - **Ports:** `909x`, so jtenman runs beside the applications it administers (`808x`) - `combined` 9090,
   `command/server` 9091, `query/server` 9092, `process/server` 9093

@@ -6,8 +6,15 @@ Authentication, authorization and provisioning for jtenman. Part of the steering
 jtenman is the **control plane**: it decides which realms are tenants of which applications. It is
 therefore both the most privileged component of the system and the one that must be locked down hardest.
 
-**Keycloak version: 26.x.** The fine-grained admin permission model was reworked inside this line, so
-`org.keycloak:keycloak-admin-client` must be pinned to the same version as the server it administers.
+**Keycloak version: 26.x.** The fine-grained admin permission model was reworked inside this line, so the
+major matters: `org.keycloak:keycloak-admin-client` must come from the **same major** as the server it
+administers.
+
+It must *not* be pinned to the server's exact version. Keycloak releases the server and the Java client
+on deliberately decoupled lifecycles: the client stays in the `26.0.x` stream and is built to work
+against the whole of major 26, so `26.0.12` administers a server anywhere from `26.0.0` to `26.7.1`.
+Expect the two numbers to diverge - a client that looks "behind" the server is the intended state, not
+drift to be corrected.
 
 ## jtenman itself: one realm, no tenants
 
