@@ -5,6 +5,7 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import org.fuin.ddd4j.core.EventId;
 import org.fuin.ddd4j.core.EventType;
+import org.fuin.ddd4j.core.ReturnFromExileEvent;
 import org.fuin.ddd4j.jackson.AbstractDomainEvent;
 import org.fuin.esc.api.HasSerializedDataTypeConstant;
 import org.fuin.esc.api.SerializedDataType;
@@ -15,7 +16,7 @@ import org.fuin.objects4j.core.KeyValueEL;
  * A suspended tenant was resumed and its realm enabled again.
  */
 @HasSerializedDataTypeConstant
-public final class TenantResumedEvent extends AbstractDomainEvent<TenantRealmId> {
+public final class TenantResumedEvent extends AbstractDomainEvent<TenantRealmId> implements ReturnFromExileEvent {
 
     @Serial
     private static final long serialVersionUID = 1000L;

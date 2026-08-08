@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import org.fuin.ddd4j.core.EventId;
 import org.fuin.ddd4j.core.EventType;
+import org.fuin.ddd4j.core.ExodusEvent;
 import org.fuin.ddd4j.jackson.AbstractDomainEvent;
 import org.fuin.esc.api.HasSerializedDataTypeConstant;
 import org.fuin.esc.api.SerializedDataType;
@@ -17,7 +18,7 @@ import org.fuin.objects4j.core.KeyValueEL;
  * A tenant was deleted for good: its realm, and with it every user and every personal detail the realm held, is gone from Keycloak. <p> This is the event that makes erasure possible. Everything jtenman keeps about people is an opaque subject id, so once the realm is gone those ids resolve to nobody - the history of what was provisioned survives without the personal data it once pointed at.
  */
 @HasSerializedDataTypeConstant
-public final class TenantDeletedEvent extends AbstractDomainEvent<TenantRealmId> {
+public final class TenantDeletedEvent extends AbstractDomainEvent<TenantRealmId> implements ExodusEvent {
 
     @Serial
     private static final long serialVersionUID = 1000L;

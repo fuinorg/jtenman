@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import org.fuin.ddd4j.core.EventId;
 import org.fuin.ddd4j.core.EventType;
+import org.fuin.ddd4j.core.ExileEvent;
 import org.fuin.ddd4j.jackson.AbstractDomainEvent;
 import org.fuin.esc.api.HasSerializedDataTypeConstant;
 import org.fuin.esc.api.SerializedDataType;
@@ -17,7 +18,7 @@ import org.fuin.objects4j.core.KeyValueEL;
  * A tenant was suspended and its realm disabled. Subscriptions are kept.
  */
 @HasSerializedDataTypeConstant
-public final class TenantSuspendedEvent extends AbstractDomainEvent<TenantRealmId> {
+public final class TenantSuspendedEvent extends AbstractDomainEvent<TenantRealmId> implements ExileEvent {
 
     @Serial
     private static final long serialVersionUID = 1000L;

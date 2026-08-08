@@ -195,6 +195,7 @@ context org.fuin.jtenman {
         /**
          * A tenant was suspended and its realm disabled. Subscriptions are kept.
          */
+        @ExileEvent
         event TenantSuspendedEvent {
 
             /** Why the tenant was suspended, for the audit trail. */
@@ -207,6 +208,7 @@ context org.fuin.jtenman {
         /**
          * A suspended tenant was resumed and its realm enabled again.
          */
+        @ReturnFromExileEvent
         event TenantResumedEvent {
             message "Resumed tenant"
         }
@@ -219,6 +221,7 @@ context org.fuin.jtenman {
          * opaque subject id, so once the realm is gone those ids resolve to nobody - the history of what
          * was provisioned survives without the personal data it once pointed at.
          */
+        @ExodusEvent
         event TenantDeletedEvent {
 
             /** Why the tenant was deleted, for whatever audit trail is kept outside jtenman. */
