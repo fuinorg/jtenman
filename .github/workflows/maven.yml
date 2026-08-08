@@ -25,12 +25,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # No "cache: maven" here on purpose: the explicit cache below already manages "~/.m2", and two
+      # actions restoring and saving the same directory in one job is a race nobody can reason about.
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
           java-version: '25'
           distribution: 'zulu'
-          cache: maven
 
       - name: Cache Maven packages
         uses: actions/cache@v5
@@ -38,6 +39,17 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+
+      # The cache is restored by prefix ("restore-keys"), so ANY previous run's "~/.m2" may come back -
+      # including one holding an org.fuin SNAPSHOT older than the build needs. That is not hypothetical:
+      # a build failed on "cannot find symbol: ReturnFromExileEvent" against a ddd-4-java snapshot that
+      # had been published 17 minutes earlier, with "-U" already in the command line.
+      #
+      # "-U" alone is not enough, because it only forces a re-check - it cannot help when the metadata
+      # that comes back is itself stale. Deleting our own artifacts makes the point moot: they are always
+      # fetched fresh, while the cache keeps doing its job for the third-party jars that make up its bulk.
+      - name: Never reuse cached org.fuin snapshots
+        run: rm -rf ~/.m2/repository/org/fuin
 
       # Runs the unit tests and the integration tests. The latter start KurrentDB, PostgreSQL and
       # Keycloak through Testcontainers, using the Docker daemon the runner provides. Nothing is
