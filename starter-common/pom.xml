@@ -101,6 +101,32 @@
             <artifactId>kurrentdb-client</artifactId>
         </dependency>
 
+        <!-- SingleRealmTenantRepository, which pins jtenman's trust boundary to one realm. -->
+        <dependency>
+            <groupId>org.fuin.cqrs4j</groupId>
+            <artifactId>cqrs-4-java-springboot-keycloak-core</artifactId>
+        </dependency>
+
+        <!-- provided -->
+
+        <!-- Referenced only by the 'before' attribute of SingleRealmTenantAutoConfiguration, so it is
+             needed to compile and to test but must not become a transitive dependency: the deployables
+             declare the keycloak starter themselves, and an application administered by jtenman must
+             never inherit it from here. -->
+        <dependency>
+            <groupId>org.fuin.cqrs4j</groupId>
+            <artifactId>cqrs-4-java-springboot-keycloak-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- test -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>

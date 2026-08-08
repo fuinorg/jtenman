@@ -25,12 +25,35 @@ jtenman uses the same Keycloak starter as an administered application, but is **
   tenant-scoped
 - `spring.security.oauth2.resourceserver.jwt.audiences=jtenman-api` - the starter refuses to start
   without it
-- **`SingleRealmTenantRepository`** pinned to the administration realm
+- **`SingleRealmTenantRepository`** pinned to the administration realm, declared by
+  `SingleRealmTenantAutoConfiguration` in `starter-common`
 
 That last one is not optional. `KeycloakTenantRepository` discovers realms on demand **regardless of the
 multitenancy flag**, so without replacing it jtenman would accept a token from any realm of the Keycloak
 instance - including a realm it just created for a tenant. The control plane would inherit the exact bug
 it exists to fix.
+
+It is an **auto-configuration**, not something each deployable imports: all four (combined,
+command/server, query/server, process/server) reach it through their jtenman starter, and a fifth added
+later gets it without anyone remembering to. A forgotten import would leave a silently discovering
+repository, which is the one failure this is here to prevent. It is ordered `before`
+`KeycloakSecurityAutoConfiguration`, whose own repository bean is
+`@ConditionalOnMissingBean(JwtTenantRepository.class)` and has to see this one already registered to back
+off. On start each server logs the one issuer it accepts, so the trust boundary of a running instance is
+readable from its log:
+
+```
+Tenant trust boundary pinned to the single issuer 'http://localhost:8180/realms/master' - every other
+realm of this Keycloak instance is rejected
+```
+
+`SingleRealmTenantAutoConfigurationTest` asserts the part that would otherwise regress unnoticed: loaded
+beside the keycloak starter, exactly one `JwtTenantRepository` remains and it is the single-realm one.
+
+**`starter-common` is jtenman-internal.** An application administered *by* jtenman must keep the
+discovering - later the jtenman-fed - repository; pinning it to one realm would make it reject every one
+of its own tenants. That is why the keycloak starter is a `provided` dependency there rather than a
+compile one, so it cannot travel to a consumer through `jtenman-query-starter`.
 
 Access is restricted to a `tenant-admin` realm role.
 
