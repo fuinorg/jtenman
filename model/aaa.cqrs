@@ -1,0 +1,18 @@
+context org.fuin.jtenman {
+
+	/*
+	 * The reusable "common" modules (types, basics, constraints, exceptions). Declared here on the
+	 * context, the artifact - an ordinary jar carrying the models under "model/" - is resolved by Maven
+	 * into the local repository and read straight out of there; nothing is unpacked. Which of their
+	 * types a module actually sees is decided by its own "import" lines - a dependency alone makes
+	 * nothing visible.
+	 */
+	dependency "org.fuin.dsl.cqrs.contexts:cqrs-common-model:0.1.0-SNAPSHOT"
+
+	/*
+	 * No "SrcGen4J" hint: where generated code goes is decided by the "model2JavaPackage" and
+	 * "artifact2Target" scripts shipped with ddd-templates, and this project wants exactly that layout.
+	 * Declare the hint with a script of its own to deviate from it.
+	 */
+
+}

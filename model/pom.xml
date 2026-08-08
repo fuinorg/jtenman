@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.fuin</groupId>
+        <artifactId>jtenman</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>jtenman-models</artifactId>
+
+    <name>jtenman-models</name>
+    <description>CQRS (.cqrs) model files and the SrcGen4J code generator - not published</description>
+
+    <properties>
+        <!-- Xtext / EMF are not yet validated on Java 25, so the generator module pins Java 21. -->
+        <java.version>21</java.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+
+        <ddd-templates.version>0.2.0-SNAPSHOT</ddd-templates.version>
+        <org.eclipse.core.runtime.version>3.31.0</org.eclipse.core.runtime.version>
+        <org.eclipse.emf.ecore.change.version>2.16.0</org.eclipse.emf.ecore.change.version>
+        <org.eclipse.emf.ecore.version>2.36.0</org.eclipse.emf.ecore.version>
+        <srcgen4j-core.version>0.5.0-SNAPSHOT</srcgen4j-core.version>
+        <xtext.version>2.42.0</xtext.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>org.fuin.srcgen4j</groupId>
+            <artifactId>srcgen4j-core</artifactId>
+            <version>${srcgen4j-core.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin</groupId>
+            <artifactId>utils4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.dsl.ddd</groupId>
+            <artifactId>ddd-templates</artifactId>
+            <version>${ddd-templates.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+        </dependency>
+
+        <!-- EMF Ecore -->
+
+        <dependency>
+            <groupId>org.eclipse.emf</groupId>
+            <artifactId>org.eclipse.emf.ecore</artifactId>
+            <version>${org.eclipse.emf.ecore.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.emf</groupId>
+            <artifactId>org.eclipse.emf.ecore.change</artifactId>
+            <version>${org.eclipse.emf.ecore.change.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- XTEXT -->
+
+        <dependency>
+            <groupId>org.eclipse.xtext</groupId>
+            <artifactId>org.eclipse.xtend.lib</artifactId>
+            <version>${xtext.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.platform</groupId>
+            <artifactId>org.eclipse.core.runtime</artifactId>
+            <version>${org.eclipse.core.runtime.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.xtext</groupId>
+            <artifactId>org.eclipse.xtend.core</artifactId>
+            <version>${xtext.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+
+        <plugins>
+
+            <!-- The DSL is private to jtenman: nothing outside imports this model, so the artifact is
+                 never published. Only the generated command/query API jars are (see steering/tech.md). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.fuin.srcgen4j</groupId>
+                <artifactId>srcgen4j-maven-plugin</artifactId>
+                <version>0.5.0-SNAPSHOT</version>
+                <configuration>
+                    <jaxbClasses>
+                        <jaxbClass>org.fuin.srcgen4j.core.xtext.XtextParserConfig</jaxbClass>
+                        <jaxbClass>org.fuin.srcgen4j.core.emf.EMFGeneratorConfig</jaxbClass>
+                    </jaxbClasses>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>srcgen4j</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>process-template</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.fuin.dsl.ddd</groupId>
+                        <artifactId>ddd-templates</artifactId>
+                        <version>0.2.0-SNAPSHOT</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+</project>

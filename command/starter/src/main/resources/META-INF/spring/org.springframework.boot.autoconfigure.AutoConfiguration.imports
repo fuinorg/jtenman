@@ -1,0 +1,2 @@
+org.fuin.jtenman.command.starter.CommandAutoConfiguration
+org.fuin.jtenman.command.starter.CommandDispatcherAutoConfiguration

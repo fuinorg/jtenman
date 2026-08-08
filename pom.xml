@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.14</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>org.fuin</groupId>
+    <artifactId>jtenman</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>jtenman</name>
+    <description>Tenant control plane - registers tenants and the applications they use (CQRS)</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <utils4.version>0.16.1-SNAPSHOT</utils4.version>
+        <objects4j.version>0.12.0-SNAPSHOT</objects4j.version>
+        <ddd4j.version>0.8.0-SNAPSHOT</ddd4j.version>
+        <cqrs4j.version>0.7.0-SNAPSHOT</cqrs4j.version>
+        <esc.version>0.10.0-SNAPSHOT</esc.version>
+        <jandex.version>3.2.7</jandex.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
+        <org-fuin-bom.version>1.0.2-SNAPSHOT</org-fuin-bom.version>
+        <junit-bom.version>5.14.4</junit-bom.version>
+        <classgraph.version>4.8.184</classgraph.version>
+        <jspecify.version>1.0.0</jspecify.version>
+        <error-prone.version>2.50.0</error-prone.version>
+        <nullaway.version>0.13.6</nullaway.version>
+        <!-- Empty by default; a module overrides it to add NullAway options (see maven-compiler-plugin). -->
+        <nullaway.extraOpts/>
+        <cqrs-common-java.version>0.1.0-SNAPSHOT</cqrs-common-java.version>
+        <rest-assured.version>5.5.0</rest-assured.version>
+        <springdoc.version>2.8.6</springdoc.version>
+        <!-- Must match the Keycloak version jtenman administers (steering/tech.md). -->
+        <keycloak.version>26.0.7</keycloak.version>
+        <!-- Annotations only: @RegisterRestClient on the generated «View»ResourceApi contracts in
+             query/api. Not managed by spring-boot-dependencies, so pin it here. -->
+        <microprofile-rest-client.version>4.0</microprofile-rest-client.version>
+    </properties>
+
+    <dependencyManagement>
+
+        <dependencies>
+
+            <!-- bom -->
+
+            <!-- Align the entire JUnit stack (jupiter + platform) to a single version. The Spring Boot
+                 parent manages jupiter/platform at one version, while org.fuin:bom pulls
+                 junit-platform-suite at another, leaving the platform jars mismatched and breaking test
+                 discovery. Importing junit-bom first wins and keeps them in sync. -->
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Super BOM aligned with the Spring Boot 3.5 BOM. MUST stay ahead of any other imported
+                 BOM: an imported BOM only wins against another imported BOM declared later. -->
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>bom</artifactId>
+                <version>${org-fuin-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.objects4j</groupId>
+                <artifactId>objects4j-bom</artifactId>
+                <version>${objects4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.esc</groupId>
+                <artifactId>esc-bom</artifactId>
+                <version>${esc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.ddd4j</groupId>
+                <artifactId>ddd-4-java-bom</artifactId>
+                <version>${ddd4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-bom</artifactId>
+                <version>${cqrs4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- project -->
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-shared</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-starter-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-command-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-command-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-command-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-query-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-query-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-query-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-process-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-process-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-process-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- compile -->
+
+            <dependency>
+                <groupId>org.fuin.dsl.cqrs.contexts</groupId>
+                <artifactId>cqrs-common-java</artifactId>
+                <version>${cqrs-common-java.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jspecify</groupId>
+                <artifactId>jspecify</artifactId>
+                <version>${jspecify.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>utils4j</artifactId>
+                <version>${utils4.version}</version>
+            </dependency>
+
+            <!-- Admin API client used to provision realms and clients. Its version must match the
+                 Keycloak version being administered - the admin API is not compatible across majors. -->
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-admin-client</artifactId>
+                <version>${keycloak.version}</version>
+            </dependency>
+
+            <!-- Not part of the cqrs-4-java BOM, so pin it to the same version as the rest. -->
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-test-helper</artifactId>
+                <version>${cqrs4j.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>rest-assured</artifactId>
+                <version>${rest-assured.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.eclipse.microprofile.rest.client</groupId>
+                <artifactId>microprofile-rest-client-api</artifactId>
+                <version>${microprofile-rest-client.version}</version>
+            </dependency>
+
+            <!-- Override the classgraph version dragged in transitively by webjars-locator-core; newer
+                 releases avoid the deprecated sun.misc.Unsafe::invokeCleaner call that warns on JDK 25. -->
+            <dependency>
+                <groupId>io.github.classgraph</groupId>
+                <artifactId>classgraph</artifactId>
+                <version>${classgraph.version}</version>
+            </dependency>
+
+        </dependencies>
+
+    </dependencyManagement>
+
+    <!-- JSpecify annotations (@NullMarked / @Nullable) are used across every module, so they are
+         declared once here and inherited by all children. -->
+    <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+    </dependencies>
+
+    <modules>
+        <module>model</module>
+        <module>shared</module>
+        <module>starter-common</module>
+        <module>query</module>
+        <module>command</module>
+        <module>process</module>
+        <module>combined</module>
+    </modules>
+
+    <build>
+
+        <plugins>
+
+            <!-- Integration tests are named "*IT" and spin up containers, so they run in the "verify"
+                 phase via failsafe - surefire's default includes ("*Test") deliberately do not match
+                 them, keeping "mvn test" free of any container runtime. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Error Prone hosts the NullAway null-safety check. NullAway only inspects @NullMarked
+                 (JSpecify) packages (OnlyNullMarked=true), so modules/packages without a @NullMarked
+                 package-info are left untouched. Test sources are excluded. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <!-- "nullaway.extraOpts" is the extension point for a module that needs one more
+                             NullAway option: -XepOpt is only recognised inside this -Xplugin string, so a
+                             module cannot simply append a compiler argument of its own. -->
+                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepExcludedPaths:.*/src/test/.* -XepOpt:NullAway:OnlyNullMarked=true ${nullaway.extraOpts}</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.uber.nullaway</groupId>
+                            <artifactId>nullaway</artifactId>
+                            <version>${nullaway.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+</project>

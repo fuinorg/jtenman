@@ -1,0 +1,10 @@
+{
+  "reason": "Contract terminated",
+  "eventType": "SuspendTenantCommand",
+  "event-id": "fb357e2b-ee23-46c0-b862-b83b13bfcbb5",
+  "event-timestamp": "2026-01-01T09:04:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

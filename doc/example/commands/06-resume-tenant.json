@@ -1,0 +1,9 @@
+{
+  "eventType": "ResumeTenantCommand",
+  "event-id": "0b293a65-72ba-4267-97ef-cdc6f2a955c9",
+  "event-timestamp": "2026-01-01T09:05:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

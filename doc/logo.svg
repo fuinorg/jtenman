@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256"
+     role="img" aria-labelledby="jtenman-logo-title jtenman-logo-desc">
+
+  <title id="jtenman-logo-title">jtenman</title>
+  <desc id="jtenman-logo-desc">A central keyhole shaped like a J, connected by dashed lines to four
+    outlined squares representing tenant realms.</desc>
+
+  <!-- Indigo reads on both a white and a dark background, so the mark needs no light/dark variant. -->
+  <g fill="none" stroke="#4C6EF5" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- Tenants replicate the list over the wire: dashed, not solid. -->
+    <g stroke-width="1.6" stroke-dasharray="2 2.6" opacity="0.75">
+      <path d="M24 24 16.5 16.5"/>
+      <path d="M40 24 47.5 16.5"/>
+      <path d="M24 40 16.5 47.5"/>
+      <path d="M40 40 47.5 47.5"/>
+    </g>
+
+    <!-- Four tenant realms. -->
+    <g stroke-width="2.4">
+      <rect x="4.5" y="4.5" width="12" height="12" rx="3.2"/>
+      <rect x="47.5" y="4.5" width="12" height="12" rx="3.2"/>
+      <rect x="4.5" y="47.5" width="12" height="12" rx="3.2"/>
+      <rect x="47.5" y="47.5" width="12" height="12" rx="3.2"/>
+    </g>
+
+  </g>
+
+  <!-- The control plane: solid, because it is the authority the others copy from. -->
+  <rect x="23" y="23" width="18" height="18" rx="5" fill="#4C6EF5"/>
+
+  <!-- Keyhole, knocked out of the block. Its stem hooks left into a J. -->
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round">
+    <circle cx="32" cy="29.6" r="2.9" stroke-width="2.2"/>
+    <path d="M32 33.2v2.4c0 1.5-1.2 2.3-2.5 1.9" stroke-width="2.2"/>
+  </g>
+
+</svg>

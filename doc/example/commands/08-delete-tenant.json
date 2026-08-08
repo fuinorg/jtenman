@@ -1,0 +1,10 @@
+{
+  "reason": "Contract terminated - erasure requested",
+  "eventType": "DeleteTenantCommand",
+  "event-id": "dbae1c23-f843-402e-9253-ef8192e85812",
+  "event-timestamp": "2026-01-01T09:06:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

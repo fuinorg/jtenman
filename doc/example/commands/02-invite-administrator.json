@@ -1,0 +1,10 @@
+{
+  "email": "admin@acme.example.com",
+  "eventType": "InviteAdministratorCommand",
+  "event-id": "2722e428-aeb6-4d52-a1d7-a1f3b31faae3",
+  "event-timestamp": "2026-01-01T09:01:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

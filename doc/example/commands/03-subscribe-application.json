@@ -1,0 +1,10 @@
+{
+  "application": "melkheftken",
+  "eventType": "SubscribeApplicationCommand",
+  "event-id": "e23b3fca-8ec9-4cab-990c-3b2b0efed5b1",
+  "event-timestamp": "2026-01-01T09:02:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

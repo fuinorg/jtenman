@@ -1,0 +1,53 @@
+name: Java Maven Build
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'zulu'
+          cache: maven
+
+      - name: Cache Maven packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # Runs the unit tests and the integration tests. The latter start KurrentDB, PostgreSQL and
+      # Keycloak through Testcontainers, using the Docker daemon the runner provides. Nothing is
+      # deployed.
+      #
+      # "-s settings.xml" adds the snapshot repositories every org.fuin dependency is resolved from -
+      # jtenman builds against SNAPSHOTs of cqrs-4-java, ddd-4-java and esc, so "-U" is not optional
+      # either: without it a cached snapshot older than the one the build needs is used silently.
+      #
+      # The Error Prone / NullAway "--add-exports jdk.compiler/..." flags come from .mvn/jvm.config in
+      # this repository, so nothing has to be passed here for them.
+      - name: Build with Maven
+        run: mvn clean verify -U -B --file pom.xml -s settings.xml

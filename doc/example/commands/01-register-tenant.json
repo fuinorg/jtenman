@@ -1,0 +1,10 @@
+{
+  "realm": "acme",
+  "eventType": "RegisterTenantCommand",
+  "event-id": "3cbaaae5-3af8-449b-90ff-5ace50e529f1",
+  "event-timestamp": "2026-01-01T09:00:00+01:00",
+  "correlation-id": null,
+  "causation-id": null,
+  "entity-id-path": "Tenant acme",
+  "aggregate-version": null
+}

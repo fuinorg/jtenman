@@ -1,0 +1,71 @@
+# Infrastructure for running jtenman locally: the event store the command side writes to, the database
+# the read model lives in, and the Keycloak instance jtenman administers.
+#
+#   podman compose up -d     (or: docker compose up -d)
+#   podman compose down      (add -v to drop the volumes as well)
+#
+# Ports are deliberately different from the ones an administered application uses, so both can run side
+# by side on one machine.
+
+services:
+
+  # Event store. KURRENTDB_MEM_DB keeps everything in memory: a restart is a clean slate, which is what
+  # you want while developing. Remove it and add a volume when tenant events should survive a restart.
+  kurrentdb:
+    image: kurrentplatform/kurrentdb:26.1
+    container_name: jtenman-kurrentdb
+    environment:
+      KURRENTDB_MEM_DB: "TRUE"
+      KURRENTDB_RUN_PROJECTIONS: "All"
+      KURRENTDB_INSECURE: "true"
+      KURRENTDB_LOG: "/tmp/log-kurrentdb"
+    ports:
+      # 2113 is both the gRPC endpoint the application uses and the web UI: http://localhost:2113
+      - "2113:2113"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:2113/web/index.html || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Read model database.
+  postgres:
+    image: postgres:16-alpine
+    container_name: jtenman-postgres
+    environment:
+      POSTGRES_DB: jtenman
+      POSTGRES_USER: jtenman
+      POSTGRES_PASSWORD: jtenman
+    ports:
+      - "5442:5432"
+    volumes:
+      - jtenman-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jtenman -d jtenman"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # The Keycloak instance jtenman administers. Development mode only: no TLS, and the admin account
+  # below is a local convenience. Never use these values anywhere but on a developer machine.
+  #
+  # jtenman authenticates against the master realm and provisions tenant realms under the rights of the
+  # signed-in administrator - it holds no credential of its own for that (see steering/security.md).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: jtenman-keycloak
+    command: ["start-dev", "--http-port=8180"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8180:8180"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8180 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  jtenman-postgres:

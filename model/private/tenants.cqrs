@@ -1,0 +1,713 @@
+context org.fuin.jtenman {
+
+    module tenants {
+    	import org.fuin.dsl.cqrs.common.basics.*
+    	import org.fuin.dsl.cqrs.common.constraints.*
+    	import org.fuin.dsl.cqrs.common.types.*
+
+        /**
+         * A tenant is already registered for that realm. The realm name is the tenant's identity,
+         * so it can only be registered once.
+         */
+        exception TenantAlreadyRegisteredException {
+            /** The realm that is already registered. */
+            String realm
+            message "A tenant is already registered for realm '${realm}'"
+        }
+
+        /**
+         * An application that is not part of the configured catalogue was named. Which applications
+         * exist is deployment configuration, not domain state, so an unknown identifier is a mistake
+         * rather than something to record.
+         */
+        exception UnknownApplicationException {
+            /** The identifier that is not in the catalogue. */
+            String application
+            message "Unknown application '${application}' - it is not in the configured catalogue"
+        }
+
+        /**
+         * The tenant is already subscribed to that application. Subscribing twice would create a
+         * second Keycloak client for the same purpose.
+         */
+        exception ApplicationAlreadySubscribedException {
+            /** The realm of the tenant. */
+            String realm
+            /** The application the tenant already uses. */
+            String application
+            message "Tenant '${realm}' is already subscribed to application '${application}'"
+        }
+
+        /**
+         * The tenant does not use that application, so there is nothing to unsubscribe from.
+         */
+        exception ApplicationNotSubscribedException {
+            /** The realm of the tenant. */
+            String realm
+            /** The application the tenant does not use. */
+            String application
+            message "Tenant '${realm}' is not subscribed to application '${application}'"
+        }
+
+        /**
+         * A tenant was deleted while it was still active. Deleting is irreversible, so it is only
+         * allowed once access has been revoked and that revocation has reached every application.
+         */
+        exception TenantNotSuspendedException {
+            /** The realm that is still active. */
+            String realm
+            message "Tenant '${realm}' must be suspended before it can be deleted"
+        }
+
+        /**
+         * An operation was attempted on a tenant that has already been deleted.
+         * <p>
+         * Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be
+         * reached at all. This covers the window in between: recording the deletion and removing the
+         * aggregate are two calls with no shared transaction, so a tenant can survive its own deletion -
+         * and it must not act afterwards, least of all against a realm that is already gone.
+         */
+        exception TenantAlreadyDeletedException {
+            /** The realm of the deleted tenant. */
+            String realm
+            message "Tenant '${realm}' has been deleted"
+        }
+
+        /**
+         * Uniquely identifies a tenant by the name of its Keycloak realm.
+         */
+        aggregate-id TenantRealmId identifies Tenant base String {
+
+            slabel "REALM"
+            label "Realm"
+            tooltip "Name of the tenant's Keycloak realm"
+            examples "acme" "widgets_2"
+
+        }
+
+        /**
+         * Whether a tenant may currently be used. A suspended tenant keeps its subscriptions, so
+         * resuming restores exactly the previous set rather than requiring each application to be
+         * subscribed again.
+         */
+        enum TenantStatus {
+
+            instances {
+
+                /** The tenant is usable by every application it is subscribed to. */
+                ACTIVE
+
+                /** Access is revoked everywhere; the realm is disabled in Keycloak. */
+                SUSPENDED
+
+            }
+
+        }
+
+        /**
+         * The name of a tenant's Keycloak realm.
+         * <p>
+         * The constraints are <b>not</b> a style preference: the resource-server side derives an
+         * "org.fuin.ddd4j.core.TenantId" from the realm segment of the token issuer while decoding, and
+         * that type accepts 2-10 characters matching "^[a-z][a-z|0-9|_]*[a-z|0-9]$". A realm outside
+         * that range makes token decoding throw in every consuming application, so it is refused here -
+         * in the control plane, where a person sees the message.
+         */
+        value-object RealmName base String {
+            String value invariants Length(2, 10), Pattern("^[a-z][a-z0-9_]*[a-z0-9]$") {
+                examples "acme" "widgets_2"
+            }
+        }
+
+        /**
+         * Issuer URI of the tenant's realm, as it appears in the "iss" claim of its tokens.
+         */
+        value-object IssuerUri base String {
+            String value invariants Length(1, 255) {
+                examples "https://keycloak.example.com/realms/acme"
+            }
+        }
+
+        /**
+         * Identifies a person in the tenant's realm - the OpenID Connect "sub" claim.
+         * <p>
+         * This is deliberately the <b>only</b> thing about a person that ever reaches the event stream.
+         * An email address or a name would become immutable personal data that a deletion request could
+         * not reach, whereas an opaque subject id stops resolving to anybody once the user is removed
+         * from Keycloak.
+         */
+        value-object SubjectId base String {
+            String value invariants Length(1, 64) {
+                examples "f7c1a2e4-9b3d-4c11-8e6a-0d2f5b7c9e13"
+            }
+        }
+
+        /**
+         * Why a tenant was suspended. Kept as a value object rather than a bare string so the reason
+         * stays part of the audit trail with a meaning of its own.
+         */
+        value-object SuspensionReason base String {
+            String value invariants Length(1, 500) {
+                examples "Contract terminated" "Payment overdue since 2026-06-01"
+            }
+        }
+
+        /**
+         * Identifies one of the applications of the system. The catalogue that maps it to a Keycloak
+         * client and an audience is configuration; only the identifier is domain state, because the
+         * client name and audience are deployment details that may change without a domain event.
+         */
+        value-object ApplicationId base String {
+            String value invariants Length(1, 50) {
+                examples "melkheftken"
+            }
+        }
+
+        /**
+         * A tenant was registered and its realm created.
+         */
+        @GenesisEvent
+        event TenantRegisteredEvent {
+
+            /** Issuer URI of the newly created realm. */
+            IssuerUri issuerUri
+
+            message "Registered tenant '${issuerUri}'"
+
+        }
+
+        /**
+         * A tenant was subscribed to an application; the application's Keycloak client and audience
+         * mapper were created in its realm.
+         */
+        event ApplicationSubscribedEvent copies-attributes-of Tenant.subscribeApplication {
+            message "Subscribed to application '${application}'"
+        }
+
+        /**
+         * A tenant was unsubscribed from an application; the application's Keycloak client was
+         * removed from its realm again.
+         */
+        event ApplicationUnsubscribedEvent copies-attributes-of Tenant.unsubscribeApplication {
+            message "Unsubscribed from application '${application}'"
+        }
+
+        /**
+         * A person was invited to administer the tenant's realm. Records who, by subject id - never the
+         * email address the invitation was sent to.
+         */
+        event AdministratorInvitedEvent {
+
+            /** The person now able to administer the tenant's realm. */
+            SubjectId subjectId
+
+            message "Invited an administrator for the tenant"
+
+        }
+
+        /**
+         * A tenant was suspended and its realm disabled. Subscriptions are kept.
+         */
+        event TenantSuspendedEvent {
+
+            /** Why the tenant was suspended, for the audit trail. */
+            SuspensionReason reason
+
+            message "Suspended tenant"
+
+        }
+
+        /**
+         * A suspended tenant was resumed and its realm enabled again.
+         */
+        event TenantResumedEvent {
+            message "Resumed tenant"
+        }
+
+        /**
+         * A tenant was deleted for good: its realm, and with it every user and every personal detail the
+         * realm held, is gone from Keycloak.
+         * <p>
+         * This is the event that makes erasure possible. Everything jtenman keeps about people is an
+         * opaque subject id, so once the realm is gone those ids resolve to nobody - the history of what
+         * was provisioned survives without the personal data it once pointed at.
+         */
+        event TenantDeletedEvent {
+
+            /** Why the tenant was deleted, for whatever audit trail is kept outside jtenman. */
+            SuspensionReason reason
+
+            message "Deleted tenant"
+
+        }
+
+        /**
+         * A customer of the system, represented by one Keycloak realm, together with the applications
+         * it is allowed to use.
+         * <p>
+         * The subscriptions live here rather than in an aggregate of their own: a subscription has no
+         * lifecycle independent of the tenant, and suspending must revoke access to every application
+         * at once, which is a single-aggregate invariant. The collection is bounded by the number of
+         * applications in the system.
+         */
+        aggregate Tenant identifier TenantRealmId {
+
+            /** Issuer URI of the tenant's realm. */
+            IssuerUri issuerUri
+
+            /** Whether the tenant may currently be used. */
+            TenantStatus status
+
+            /** The applications this tenant is allowed to use. */
+            List<ApplicationId> applications
+
+            /**
+             * Makes sure the realm does not already exist in Keycloak before it is created.
+             */
+            business-rule RealmMustBeFree exception TenantAlreadyRegisteredException {
+                /** Registering is rare and operator driven, so the check is made against Keycloak itself. */
+                consistency strong
+            }
+
+            /**
+             * Makes sure the named application is part of the configured catalogue.
+             */
+            business-rule ApplicationMustBeKnown exception UnknownApplicationException {
+                consistency strong
+            }
+
+            /**
+             * Makes sure the tenant does not already use the application.
+             */
+            business-rule ApplicationMustNotBeSubscribed exception ApplicationAlreadySubscribedException {
+                consistency strong
+            }
+
+            /**
+             * Makes sure the tenant actually uses the application.
+             */
+            business-rule ApplicationMustBeSubscribed exception ApplicationNotSubscribedException {
+                consistency strong
+            }
+
+            /**
+             * Makes sure a tenant is suspended before it can be deleted, so access is revoked and that
+             * revocation has reached every application before anything irreversible happens.
+             */
+            business-rule MustBeSuspended exception TenantNotSuspendedException {
+                consistency strong
+            }
+
+            /**
+             * Makes sure a deleted tenant does nothing further. Every operation carries it, because after
+             * deletion there is no realm left to act on and no state worth changing.
+             */
+            business-rule MustNotBeDeleted exception TenantAlreadyDeletedException {
+                consistency strong
+            }
+
+            /**
+             * Registers a new tenant and creates its realm in Keycloak. The realm is created under the
+             * rights of the signed-in system administrator - no credential of jtenman's own is involved.
+             */
+            constructor registerTenant business-rules RealmMustBeFree fires TenantRegisteredEvent {
+
+                /** Name of the realm to create. */
+                RealmName realm
+
+                operation-context RegisterTenantService
+
+                /** Creates the tenant's realm in Keycloak. */
+                service RegisterTenantService {
+
+                    /**
+                     * Returns true if a realm of that name already exists.
+                     */
+                    method realmExists {
+
+                        /** The realm to look for. */
+                        RealmName realm
+
+                        /** True if the realm already exists. */
+                        returns Boolean
+
+                    }
+
+                    /**
+                     * Creates the realm and returns the issuer URI its tokens will carry.
+                     */
+                    method createRealm {
+
+                        /** The realm to create. */
+                        RealmName realm
+
+                        /** Issuer URI of the created realm. */
+                        returns IssuerUri
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Invites a person to administer the tenant's realm, so the tenant can manage its own users
+             * from that point on.
+             * <p>
+             * A freshly registered tenant has a realm nobody can enter. This is what makes it usable, and
+             * it is a separate operation from registering on purpose: creating the realm and inviting a
+             * person are two calls to Keycloak with no shared transaction, so folding them together would
+             * leave a realm that exists but can never be reached if the second one fails. Separate, the
+             * invitation can simply be repeated - which is also what "resend the invitation" needs.
+             * <p>
+             * <b>No password is ever created, transmitted or stored.</b> The person is created with the
+             * required actions to set their own credential and receives a one-time link by email. jtenman
+             * therefore never holds a working credential for any tenant.
+             */
+            method inviteAdministrator business-rules MustNotBeDeleted fires AdministratorInvitedEvent {
+
+                /**
+                 * Where to send the invitation. Used to send it and then forgotten - only the resulting
+                 * subject id becomes part of the event stream.
+                 */
+                EmailAddress email
+
+                operation-context InviteAdministratorService
+
+                /** Creates the person in the tenant's realm and sends the invitation. */
+                service InviteAdministratorService {
+
+                    /**
+                     * Creates a person in the tenant's realm, puts them into the group carrying the
+                     * tenant-administrator role - roles are never assigned to a user directly - and sends
+                     * a one-time link asking them to set a password. No credential is set here.
+                     */
+                    method inviteRealmAdministrator {
+
+                        /** The realm to create the person in. */
+                        RealmName realm
+
+                        /** Where to send the invitation. */
+                        EmailAddress email
+
+                        /** Subject id of the created person. */
+                        returns SubjectId
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Grants the tenant access to an application by creating that application's client and its
+             * audience mapper in the tenant's realm.
+             * <p>
+             * Both halves are needed before the tenant can use the application: the consuming
+             * application only sees tenants subscribed to it, and it rejects tokens that do not carry
+             * its audience.
+             */
+            method subscribeApplication
+                business-rules MustNotBeDeleted, ApplicationMustBeKnown, ApplicationMustNotBeSubscribed
+                fires ApplicationSubscribedEvent {
+
+                /** The application to grant access to. */
+                ApplicationId application
+
+                operation-context SubscribeApplicationService
+
+                /** Resolves the application in the catalogue and provisions its Keycloak client. */
+                service SubscribeApplicationService {
+
+                    /**
+                     * Returns true if the identifier is part of the configured application catalogue.
+                     */
+                    method isKnownApplication {
+
+                        /** The identifier to check. */
+                        ApplicationId application
+
+                        /** True if the catalogue contains it. */
+                        returns Boolean
+
+                    }
+
+                    /**
+                     * Creates the application's client in the tenant's realm, including the audience
+                     * mapper without which the application rejects every token of this tenant.
+                     */
+                    method createClient {
+
+                        /** The realm to create the client in. */
+                        RealmName realm
+
+                        /** The application whose client is created. */
+                        ApplicationId application
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Withdraws the tenant's access to an application and removes that application's client
+             * from its realm again.
+             * <p>
+             * Removing the client matters: dropping the tenant from the application's list alone
+             * leaves a realm able to mint tokens carrying that application's audience, which becomes
+             * live access again as soon as anything trusts the audience by itself.
+             */
+            method unsubscribeApplication
+                business-rules MustNotBeDeleted, ApplicationMustBeSubscribed
+                fires ApplicationUnsubscribedEvent {
+
+                /** The application to withdraw access to. */
+                ApplicationId application
+
+                operation-context UnsubscribeApplicationService
+
+                /** Removes the application's Keycloak client from the tenant's realm. */
+                service UnsubscribeApplicationService {
+
+                    /**
+                     * Deletes the application's client in the tenant's realm.
+                     */
+                    method removeClient {
+
+                        /** The realm to remove the client from. */
+                        RealmName realm
+
+                        /** The application whose client is removed. */
+                        ApplicationId application
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Revokes the tenant's access everywhere at once and disables its realm, without touching
+             * its subscriptions.
+             */
+            method suspendTenant business-rules MustNotBeDeleted fires TenantSuspendedEvent {
+
+                /** Why the tenant is being suspended. */
+                SuspensionReason reason
+
+                operation-context SuspendTenantService
+
+                /** Disables the tenant's realm in Keycloak. */
+                service SuspendTenantService {
+
+                    /**
+                     * Disables the realm, so no new token can be obtained for it.
+                     */
+                    method disableRealm {
+
+                        /** The realm to disable. */
+                        RealmName realm
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Deletes the tenant for good, removing its realm from Keycloak along with every user and
+             * every personal detail it held.
+             * <p>
+             * This is the erasure path: jtenman itself stores no personal data beyond opaque subject
+             * ids, so deleting the realm is what actually removes a person's details from the system.
+             * <p>
+             * Irreversible, and gated on the tenant being suspended first. That is not bureaucracy: it
+             * forces access to be revoked and the revocation to reach every application before anything
+             * is destroyed, and it turns an accident into two deliberate steps with a pause between them.
+             */
+            method deleteTenant business-rules MustNotBeDeleted, MustBeSuspended fires TenantDeletedEvent {
+
+                /** Why the tenant is being deleted. */
+                SuspensionReason reason
+
+                operation-context DeleteTenantService
+
+                /** Removes the tenant's realm from Keycloak. */
+                service DeleteTenantService {
+
+                    /**
+                     * Deletes the realm and everything in it - users, groups, clients.
+                     */
+                    method removeRealm {
+
+                        /** The realm to delete. */
+                        RealmName realm
+
+                    }
+
+                }
+
+            }
+
+            /**
+             * Makes a suspended tenant usable again, restoring exactly the subscriptions it had.
+             */
+            method resumeTenant business-rules MustNotBeDeleted fires TenantResumedEvent {
+
+                operation-context ResumeTenantService
+
+                /** Enables the tenant's realm in Keycloak again. */
+                service ResumeTenantService {
+
+                    /**
+                     * Enables the realm.
+                     */
+                    method enableRealm {
+
+                        /** The realm to enable. */
+                        RealmName realm
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        /** Register a new tenant and create its realm. */
+        command RegisterTenantCommand target Tenant.registerTenant {
+            message "Register tenant '${realm}'"
+        }
+
+        /** Invite a person to administer the tenant's realm. */
+        command InviteAdministratorCommand target Tenant.inviteAdministrator {
+            message "Invite an administrator for the tenant"
+        }
+
+        /** Grant a tenant access to an application. */
+        command SubscribeApplicationCommand target Tenant.subscribeApplication {
+            message "Subscribe to application '${application}'"
+        }
+
+        /** Withdraw a tenant's access to an application. */
+        command UnsubscribeApplicationCommand target Tenant.unsubscribeApplication {
+            message "Unsubscribe from application '${application}'"
+        }
+
+        /** Suspend a tenant and disable its realm. */
+        command SuspendTenantCommand target Tenant.suspendTenant {
+            message "Suspend tenant"
+        }
+
+        /** Delete a suspended tenant for good, removing its realm from Keycloak. */
+        command DeleteTenantCommand target Tenant.deleteTenant {
+            message "Delete tenant"
+        }
+
+        /** Resume a suspended tenant. */
+        command ResumeTenantCommand target Tenant.resumeTenant {
+            message "Resume tenant"
+        }
+
+        /**
+         * A read-model row describing one tenant of one application - the answer a consuming
+         * application replicates to decide which issuers it trusts.
+         */
+        value-object TenantDetails {
+
+            /** Aggregate this row was projected from and the version it reflects. */
+            VersionedEntityIdPath source
+
+            /** Name of the tenant's realm. */
+            RealmName realm
+
+            /** Issuer URI the tenant's tokens carry. */
+            IssuerUri issuerUri
+
+            /** Whether the tenant may currently be used. */
+            TenantStatus status
+
+        }
+
+        /**
+         * Projects the tenant events, so the list can be read back without replaying the aggregates.
+         */
+        projection Tenants input
+            TenantRegisteredEvent,
+            ApplicationSubscribedEvent,
+            ApplicationUnsubscribedEvent,
+            TenantSuspendedEvent,
+            TenantResumedEvent,
+            TenantDeletedEvent
+    }
+
+    module tenants.tenantview {
+    	import org.fuin.jtenman.tenants.*
+    	import org.fuin.dsl.cqrs.common.types.*
+
+        /**
+         * Reads the tenants of one application. This is the contract consuming applications poll to
+         * keep their local replica current, so its shape and path are a machine interface.
+         */
+        view TenantView uses Tenants rest-path "/view/tenant" {
+
+            // Read-model tables backing this view. Two of them, each with a single-column key:
+            //
+            //  - "tenants" carries what belongs to the tenant itself, so the issuer URI and the status
+            //    are stored once rather than repeated on every subscription and updated in N places when
+            //    a tenant is suspended.
+            //  - "tenant_applications" carries the subscriptions, keyed by "«realm»:«application»", so
+            //    a query by application is an indexed lookup.
+            //
+            // A composite key across (realm, application) would be the obvious modelling, but two @Id
+            // fields need an @IdClass the generator does not emit - the entity would compile and fail
+            // the first time the projection writes a row.
+            hint JpaHint {
+                "tables": [
+                    {
+                        "className": "TenantEntity",
+                        "name": "tenants",
+                        "columns": [
+                            { "fieldName": "realm", "javaType": "String", "id": true, "name": "realm", "nullable": false, "length": 10 },
+                            { "fieldName": "issuerUri", "javaType": "String", "name": "issuer_uri", "nullable": false, "length": 255 },
+                            { "fieldName": "status", "javaType": "String", "name": "status", "nullable": false, "length": 20 },
+                            { "fieldName": "entityIdPath", "javaType": "String", "name": "entity_id_path", "nullable": false, "length": 255 },
+                            { "fieldName": "aggregateVersion", "javaType": "Integer", "name": "aggregate_version", "nullable": true }
+                        ]
+                    },
+                    {
+                        "className": "TenantApplicationEntity",
+                        "name": "tenant_applications",
+                        "indexes": [
+                            { "name": "ix_tenant_applications_app", "columnList": "application", "unique": false }
+                        ],
+                        "columns": [
+                            { "fieldName": "id", "javaType": "String", "id": true, "name": "id", "nullable": false, "length": 61 },
+                            { "fieldName": "realm", "javaType": "String", "name": "realm", "nullable": false, "length": 10 },
+                            { "fieldName": "application", "javaType": "String", "name": "application", "nullable": false, "length": 50 }
+                        ]
+                    }
+                ]
+            }
+
+            /**
+             * Returns the active tenants subscribed to one application.
+             * <p>
+             * Suspended tenants are left out rather than returned with their state: a caller that
+             * forgets to filter would otherwise keep accepting a suspended tenant's tokens.
+             */
+            method listByApplication {
+
+                /** The application to list the tenants of. */
+                ApplicationId application
+
+                /** The active tenants subscribed to that application. */
+                returns List<TenantDetails>
+
+            }
+
+        }
+    }
+}

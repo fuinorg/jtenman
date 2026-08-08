@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<srcgen4j-config xmlns="http://www.fuin.org/srcgen4j/commons/0.5.0"
+	xmlns:xtext="http://www.fuin.org/srcgen4j/core/xtext/0.5.0"
+	xmlns:emf="http://www.fuin.org/srcgen4j/core/emf/0.5.0">
+
+	<variables>
+		<!-- SrcGen4J resolves file paths relative to the *launch* directory, not to
+		     this file, so plain relative paths break when the build runs from the
+		     project root. Anchor everything on the built-in "${rootDir}" variable,
+		     which SrcGen4J sets to this config file's own directory (model/). That
+		     makes all paths absolute and launch-directory independent.
+		     The .cqrs files live directly in model/public/ and model/private/, one per module;
+		     this points at the parent of both, because the parser descends into them and a
+		     module split over the two halves has to be read as a whole. Nothing is unpacked
+		     for the cqrs-common-model dependency - it is read inside its zip in ~/.m2. -->
+		<variable name="modelPath" value="${rootDir}" />
+		<variable name="copyrightHeader" value="" />
+		<variable name="jpa" value="true" />
+		<variable name="jaxb" value="false" />
+		<variable name="jaxb_elements" value="false" />
+		<variable name="jsonb" value="false" />
+		<variable name="jackson" value="true" />
+	</variables>
+
+	<!-- The module NAMES here must match the module names the ddd-templates
+	     generator emits, which come from its built-in preset
+	     (ddd-templates: srcgen4j-default.json). Each name is mapped to the
+	     matching physical Maven module:
+	       shared        -> value objects, events, ids, enums, exceptions, package-infos
+	       command.api   -> command messages                          -> command/api
+	       command.core  -> aggregates, entities, services            -> command/core
+	       query.core    -> views / read-model logic                  -> query/core
+	       query.api     -> view API DTOs                             -> query/api
+	       process.core  -> process managers / sagas                  -> process/core -->
+	<modules>
+		<module name="shared" path="${rootDir}/../shared"/>
+		<module name="command.api" path="${rootDir}/../command/api"/>
+		<module name="command.core" path="${rootDir}/../command/core"/>
+		<module name="query.core" path="${rootDir}/../query/core"/>
+		<module name="query.api" path="${rootDir}/../query/api"/>
+		<module name="process.core" path="${rootDir}/../process/core"/>
+		<module name="command.starter" path="${rootDir}/../command/starter"/>
+		<module name="query.starter" path="${rootDir}/../query/starter"/>
+		<module name="process.starter" path="${rootDir}/../process/starter"/>
+	</modules>
+
+	<parsers>
+		<parser name="cqrsParser" class="org.fuin.srcgen4j.core.xtext.XtextParser">
+			<config>
+				<xtext:xtext-parser-config modelPath="${modelPath}" modelExt="cqrs"
+										   setupClass="org.fuin.dsl.cqrs.CqrsDslStandaloneSetup" />
+			</config>
+		</parser>
+	</parsers>
+
+	<generators>
+
+		<generator name="sharedGenerator"
+				   class="org.fuin.srcgen4j.core.emf.EMFGenerator"
+				   parser="cqrsParser">
+			<config>
+				<emf:emf-generator-config>
+
+					<variable name="dslContext" value="org\.fuin\.jtenman\.(.*)" />
+					<variable name="sharedPkgRepl" value="org.fuin.jtenman.shared.domain.$1" />
+					<variable name="commandPkgRepl" value="org.fuin.jtenman.command.core.domain.$1" />
+					<variable name="queryPkgRepl" value="org.fuin.jtenman.query.core.domain.$1" />
+					<variable name="processPkgRepl" value="org.fuin.jtenman.process.core.domain.$1" />
+
+					<!-- Pseudo generator that only adds mapping for "types.cqrs" to Java types -->
+					<emf:artifact-factory artifact="ExternalTypes" class="org.fuin.dsl.ddd.gen.resourceset.CtxExternalTypes"/>
+
+					<emf:artifact-factory artifact="valueObject" class="org.fuin.dsl.ddd.gen.valueobject.CombinedValueObjectArtifactFactory" />
+					<emf:artifact-factory artifact="combinedAggregateId" class="org.fuin.dsl.ddd.gen.aggregateid.CombinedAggregateIdArtifactFactory" />
+					<emf:artifact-factory artifact="combinedEntityId" class="org.fuin.dsl.ddd.gen.entityid.CombinedEntityIdArtifactFactory" />
+					<emf:artifact-factory artifact="validatorAnnotation" class="org.fuin.dsl.ddd.gen.constr.ValidatorAnnotationArtifactFactory" />
+					<emf:artifact-factory artifact="validator" class="org.fuin.dsl.ddd.gen.constr.ValidatorArtifactFactory" />
+					<emf:artifact-factory artifact="enum" class="org.fuin.dsl.ddd.gen.enumobject.EnumArtifactFactory" />
+					<emf:artifact-factory artifact="exception" class="org.fuin.dsl.ddd.gen.except.ExceptionArtifactFactory" />
+					<emf:artifact-factory artifact="event" class="org.fuin.dsl.ddd.gen.event.EventArtifactFactory" />
+					<emf:artifact-factory artifact="command" class="org.fuin.dsl.ddd.gen.command.CommandArtifactFactory" />
+
+					<emf:artifact-factory artifact="packageInfo" class="org.fuin.dsl.ddd.gen.resourceset.PackageInfoArtifactFactory" />
+
+					<emf:artifact-factory artifact="springBeans" class="org.fuin.dsl.ddd.gen.resourceset.SpringBeansArtifactFactory" />
+
+					<emf:artifact-factory artifact="abstractEntity" class="org.fuin.dsl.ddd.gen.entity.AbstractEntityArtifactFactory" />
+					<emf:artifact-factory artifact="finalEntity" class="org.fuin.dsl.ddd.gen.entity.FinalEntityArtifactFactory" />
+
+					<emf:artifact-factory artifact="service" class="org.fuin.dsl.ddd.gen.service.ServiceArtifactFactory" />
+
+					<emf:artifact-factory artifact="view" class="org.fuin.dsl.ddd.gen.view.ViewArtifactFactory" />
+					<emf:artifact-factory artifact="viewSpringApi" class="org.fuin.dsl.ddd.gen.view.ViewSpringApiArtifactFactory" />
+					<emf:artifact-factory artifact="viewQuarkusApi" class="org.fuin.dsl.ddd.gen.view.ViewQuarkusApiArtifactFactory" />
+					<emf:artifact-factory artifact="finalView" class="org.fuin.dsl.ddd.gen.view.FinalViewArtifactFactory" />
+					<emf:artifact-factory artifact="jpaViewTable" class="org.fuin.dsl.ddd.gen.view.JpaViewTableArtifactFactory" />
+
+					<emf:artifact-factory artifact="abstractProcessManager" class="org.fuin.dsl.ddd.gen.processmanager.AbstractProcessManagerArtifactFactory" />
+					<emf:artifact-factory artifact="processManager" class="org.fuin.dsl.ddd.gen.processmanager.ProcessManagerArtifactFactory" />
+
+					<emf:artifact-factory artifact="abstractAggregate" class="org.fuin.dsl.ddd.gen.aggregate.AbstractAggregateArtifactFactory" />
+					<emf:artifact-factory artifact="finalAggregate" class="org.fuin.dsl.ddd.gen.aggregate.FinalAggregateArtifactFactory" />
+					<emf:artifact-factory artifact="esRepository" class="org.fuin.dsl.ddd.gen.aggregate.ESRepositoryArtifactFactory" />
+					<emf:artifact-factory artifact="esRepositoryFactory" class="org.fuin.dsl.ddd.gen.aggregate.ESRepositoryFactoryArtifactFactory" />
+					<emf:artifact-factory artifact="aggregateDoc" class="org.fuin.dsl.ddd.gen.aggregate.AggregateDocArtifactFactory" />
+
+				</emf:emf-generator-config>
+			</config>
+
+		</generator>
+	</generators>
+
+</srcgen4j-config>
