@@ -1,7 +1,9 @@
 package org.fuin.jtenman.command.core.domain.tenants;
 
 import org.fuin.ddd4j.core.ApplyEvent;
+import org.fuin.ddd4j.core.EntityIdPath;
 import org.fuin.dsl.cqrs.common.basics.EmailAddress;
+import org.fuin.dsl.cqrs.common.exceptions.EntityInStateDeletedException;
 import org.fuin.jtenman.shared.domain.tenants.AdministratorInvitedEvent;
 import org.fuin.jtenman.shared.domain.tenants.ApplicationAlreadySubscribedException;
 import org.fuin.jtenman.shared.domain.tenants.ApplicationId;
@@ -12,7 +14,6 @@ import org.fuin.jtenman.shared.domain.tenants.IssuerUri;
 import org.fuin.jtenman.shared.domain.tenants.RealmName;
 import org.fuin.jtenman.shared.domain.tenants.SubjectId;
 import org.fuin.jtenman.shared.domain.tenants.SuspensionReason;
-import org.fuin.jtenman.shared.domain.tenants.TenantAlreadyDeletedException;
 import org.fuin.jtenman.shared.domain.tenants.TenantAlreadyRegisteredException;
 import org.fuin.jtenman.shared.domain.tenants.TenantDeletedEvent;
 import org.fuin.jtenman.shared.domain.tenants.TenantNotSuspendedException;
@@ -89,7 +90,7 @@ public final class Tenant extends AbstractTenant {
      * @param email Where to send the invitation. Used to send it and then forgotten - only the resulting subject id becomes part of the event stream.
      * @param inviteAdministratorService Creates the person in the tenant's realm and sends the invitation.
      */
-    public final void inviteAdministrator(final EmailAddress email, final InviteAdministratorService inviteAdministratorService) throws TenantAlreadyDeletedException {
+    public final void inviteAdministrator(final EmailAddress email, final InviteAdministratorService inviteAdministratorService) throws EntityInStateDeletedException {
         // Check preconditions
         Contract.requireArgNotNull("email", email);
         Contract.requireArgNotNull("inviteAdministratorService", inviteAdministratorService);
@@ -118,7 +119,7 @@ public final class Tenant extends AbstractTenant {
      * @throws UnknownApplicationException An application that is not part of the configured catalogue was named. Which applications exist is deployment configuration, not domain state, so an unknown identifier is a mistake rather than something to record.
      * @throws ApplicationAlreadySubscribedException The tenant is already subscribed to that application. Subscribing twice would create a second Keycloak client for the same purpose.
      */
-    public final void subscribeApplication(final ApplicationId application, final SubscribeApplicationService subscribeApplicationService) throws TenantAlreadyDeletedException, UnknownApplicationException, ApplicationAlreadySubscribedException {
+    public final void subscribeApplication(final ApplicationId application, final SubscribeApplicationService subscribeApplicationService) throws EntityInStateDeletedException, UnknownApplicationException, ApplicationAlreadySubscribedException {
         // Check preconditions
         Contract.requireArgNotNull("application", application);
         Contract.requireArgNotNull("subscribeApplicationService", subscribeApplicationService);
@@ -150,7 +151,7 @@ public final class Tenant extends AbstractTenant {
      *
      * @throws ApplicationNotSubscribedException The tenant does not use that application, so there is nothing to unsubscribe from.
      */
-    public final void unsubscribeApplication(final ApplicationId application, final UnsubscribeApplicationService unsubscribeApplicationService) throws TenantAlreadyDeletedException, ApplicationNotSubscribedException {
+    public final void unsubscribeApplication(final ApplicationId application, final UnsubscribeApplicationService unsubscribeApplicationService) throws EntityInStateDeletedException, ApplicationNotSubscribedException {
         // Check preconditions
         Contract.requireArgNotNull("application", application);
         Contract.requireArgNotNull("unsubscribeApplicationService", unsubscribeApplicationService);
@@ -177,7 +178,7 @@ public final class Tenant extends AbstractTenant {
      * @param reason Why the tenant is being suspended.
      * @param suspendTenantService Disables the tenant's realm in Keycloak.
      */
-    public final void suspendTenant(final SuspensionReason reason, final SuspendTenantService suspendTenantService) throws TenantAlreadyDeletedException {
+    public final void suspendTenant(final SuspensionReason reason, final SuspendTenantService suspendTenantService) throws EntityInStateDeletedException {
         // Check preconditions
         Contract.requireArgNotNull("reason", reason);
         Contract.requireArgNotNull("suspendTenantService", suspendTenantService);
@@ -209,7 +210,7 @@ public final class Tenant extends AbstractTenant {
      *
      * @throws TenantNotSuspendedException A tenant was deleted while it was still active. Deleting is irreversible, so it is only allowed once access has been revoked and that revocation has reached every application.
      */
-    public final void deleteTenant(final SuspensionReason reason, final DeleteTenantService deleteTenantService) throws TenantAlreadyDeletedException, TenantNotSuspendedException {
+    public final void deleteTenant(final SuspensionReason reason, final DeleteTenantService deleteTenantService) throws EntityInStateDeletedException, TenantNotSuspendedException {
         // Check preconditions
         Contract.requireArgNotNull("reason", reason);
         Contract.requireArgNotNull("deleteTenantService", deleteTenantService);
@@ -235,7 +236,7 @@ public final class Tenant extends AbstractTenant {
      *
      * @param resumeTenantService Enables the tenant's realm in Keycloak again.
      */
-    public final void resumeTenant(final ResumeTenantService resumeTenantService) throws TenantAlreadyDeletedException {
+    public final void resumeTenant(final ResumeTenantService resumeTenantService) throws EntityInStateDeletedException {
         // Check preconditions
         Contract.requireArgNotNull("resumeTenantService", resumeTenantService);
 
@@ -293,27 +294,27 @@ public final class Tenant extends AbstractTenant {
     }
 
     /**
+     * Enforces the shared EntityMustNotBeDeletedRule.
+     * <p>
+     * Deleting a tenant records a fact and removes the realm; it deletes neither the aggregate nor its
+     * stream, so a deleted tenant loads and answers commands exactly like any other. This is the only
+     * thing that stops it. Left to the repository, the rule would depend on a stream having been
+     * removed - and removing it in the handler is what races the projection, so it is not removed at all.
+     *
+     * @throws EntityInStateDeletedException The tenant is gone.
+     */
+    private void requireNotDeleted() throws EntityInStateDeletedException {
+        if (deleted) {
+            throw new EntityInStateDeletedException(new EntityIdPath(getId()));
+        }
+    }
+
+    /**
      * The realm name is the aggregate's identity, so it is derived rather than stored a second time -
      * two copies of one value are two chances to disagree.
      *
      * @return Name of the tenant's realm.
      */
-    /**
-     * Refuses every operation on a tenant that has already been deleted.
-     * <p>
-     * Normally unreachable, because deleting removes the aggregate as well as recording the fact. It
-     * covers the window in between: recording the deletion and removing the aggregate are two calls with
-     * no shared transaction, so a tenant can outlive its own deletion. Leaving this to the repository
-     * would make a domain rule depend on whether the second call happened to succeed.
-     *
-     * @throws TenantAlreadyDeletedException The tenant is gone.
-     */
-    private void requireNotDeleted() throws TenantAlreadyDeletedException {
-        if (deleted) {
-            throw new TenantAlreadyDeletedException(getId().asBaseType());
-        }
-    }
-
     private RealmName realmName() {
         return new RealmName(getId().asBaseType());
     }

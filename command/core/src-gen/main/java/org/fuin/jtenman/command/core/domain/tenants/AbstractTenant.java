@@ -3,6 +3,7 @@ package org.fuin.jtenman.command.core.domain.tenants;
 import org.fuin.ddd4j.core.AbstractAggregateRoot;
 import org.fuin.ddd4j.core.EntityType;
 import org.fuin.dsl.cqrs.common.basics.EmailAddress;
+import org.fuin.dsl.cqrs.common.exceptions.EntityInStateDeletedException;
 import org.fuin.jtenman.shared.domain.tenants.AdministratorInvitedEvent;
 import org.fuin.jtenman.shared.domain.tenants.ApplicationAlreadySubscribedException;
 import org.fuin.jtenman.shared.domain.tenants.ApplicationId;
@@ -13,7 +14,6 @@ import org.fuin.jtenman.shared.domain.tenants.IssuerUri;
 import org.fuin.jtenman.shared.domain.tenants.RealmName;
 import org.fuin.jtenman.shared.domain.tenants.SubjectId;
 import org.fuin.jtenman.shared.domain.tenants.SuspensionReason;
-import org.fuin.jtenman.shared.domain.tenants.TenantAlreadyDeletedException;
 import org.fuin.jtenman.shared.domain.tenants.TenantDeletedEvent;
 import org.fuin.jtenman.shared.domain.tenants.TenantNotSuspendedException;
 import org.fuin.jtenman.shared.domain.tenants.TenantRealmId;
@@ -254,9 +254,9 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
      * @param email Where to send the invitation. Used to send it and then forgotten - only the resulting subject id becomes part of the event stream.
      * @param inviteAdministratorService Creates the person in the tenant's realm and sends the invitation.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      */
-    public abstract void inviteAdministrator(final EmailAddress email, final InviteAdministratorService inviteAdministratorService) throws TenantAlreadyDeletedException;
+    public abstract void inviteAdministrator(final EmailAddress email, final InviteAdministratorService inviteAdministratorService) throws EntityInStateDeletedException;
     
     /**
      * Grants the tenant access to an application by creating that application's client and its audience mapper in the tenant's realm. <p> Both halves are needed before the tenant can use the application: the consuming application only sees tenants subscribed to it, and it rejects tokens that do not carry its audience.
@@ -264,11 +264,11 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
      * @param application The application to grant access to.
      * @param subscribeApplicationService Resolves the application in the catalogue and provisions its Keycloak client.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      * @throws UnknownApplicationException An application that is not part of the configured catalogue was named. Which applications exist is deployment configuration, not domain state, so an unknown identifier is a mistake rather than something to record.
      * @throws ApplicationAlreadySubscribedException The tenant is already subscribed to that application. Subscribing twice would create a second Keycloak client for the same purpose.
      */
-    public abstract void subscribeApplication(final ApplicationId application, final SubscribeApplicationService subscribeApplicationService) throws TenantAlreadyDeletedException, UnknownApplicationException, ApplicationAlreadySubscribedException;
+    public abstract void subscribeApplication(final ApplicationId application, final SubscribeApplicationService subscribeApplicationService) throws EntityInStateDeletedException, UnknownApplicationException, ApplicationAlreadySubscribedException;
     
     /**
      * Withdraws the tenant's access to an application and removes that application's client from its realm again. <p> Removing the client matters: dropping the tenant from the application's list alone leaves a realm able to mint tokens carrying that application's audience, which becomes live access again as soon as anything trusts the audience by itself.
@@ -276,10 +276,10 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
      * @param application The application to withdraw access to.
      * @param unsubscribeApplicationService Removes the application's Keycloak client from the tenant's realm.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      * @throws ApplicationNotSubscribedException The tenant does not use that application, so there is nothing to unsubscribe from.
      */
-    public abstract void unsubscribeApplication(final ApplicationId application, final UnsubscribeApplicationService unsubscribeApplicationService) throws TenantAlreadyDeletedException, ApplicationNotSubscribedException;
+    public abstract void unsubscribeApplication(final ApplicationId application, final UnsubscribeApplicationService unsubscribeApplicationService) throws EntityInStateDeletedException, ApplicationNotSubscribedException;
     
     /**
      * Revokes the tenant's access everywhere at once and disables its realm, without touching its subscriptions.
@@ -287,9 +287,9 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
      * @param reason Why the tenant is being suspended.
      * @param suspendTenantService Disables the tenant's realm in Keycloak.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      */
-    public abstract void suspendTenant(final SuspensionReason reason, final SuspendTenantService suspendTenantService) throws TenantAlreadyDeletedException;
+    public abstract void suspendTenant(final SuspensionReason reason, final SuspendTenantService suspendTenantService) throws EntityInStateDeletedException;
     
     /**
      * Deletes the tenant for good, removing its realm from Keycloak along with every user and every personal detail it held. <p> This is the erasure path: jtenman itself stores no personal data beyond opaque subject ids, so deleting the realm is what actually removes a person's details from the system. <p> Irreversible, and gated on the tenant being suspended first. That is not bureaucracy: it forces access to be revoked and the revocation to reach every application before anything is destroyed, and it turns an accident into two deliberate steps with a pause between them.
@@ -297,18 +297,18 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
      * @param reason Why the tenant is being deleted.
      * @param deleteTenantService Removes the tenant's realm from Keycloak.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      * @throws TenantNotSuspendedException A tenant was deleted while it was still active. Deleting is irreversible, so it is only allowed once access has been revoked and that revocation has reached every application.
      */
-    public abstract void deleteTenant(final SuspensionReason reason, final DeleteTenantService deleteTenantService) throws TenantAlreadyDeletedException, TenantNotSuspendedException;
+    public abstract void deleteTenant(final SuspensionReason reason, final DeleteTenantService deleteTenantService) throws EntityInStateDeletedException, TenantNotSuspendedException;
     
     /**
      * Makes a suspended tenant usable again, restoring exactly the subscriptions it had.
      *
      * @param resumeTenantService Enables the tenant's realm in Keycloak again.
      *
-     * @throws TenantAlreadyDeletedException An operation was attempted on a tenant that has already been deleted. <p> Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be reached at all. This covers the window in between: recording the deletion and removing the aggregate are two calls with no shared transaction, so a tenant can survive its own deletion - and it must not act afterwards, least of all against a realm that is already gone.
+     * @throws EntityInStateDeletedException Expected the entity to be in normal state, but was already (soft) deleted.
      */
-    public abstract void resumeTenant(final ResumeTenantService resumeTenantService) throws TenantAlreadyDeletedException;
+    public abstract void resumeTenant(final ResumeTenantService resumeTenantService) throws EntityInStateDeletedException;
     
 }

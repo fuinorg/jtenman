@@ -2,6 +2,7 @@ context org.fuin.jtenman {
 
     module tenants {
     	import org.fuin.dsl.cqrs.common.basics.*
+    	import org.fuin.dsl.cqrs.common.rules.*
     	import org.fuin.dsl.cqrs.common.constraints.*
     	import org.fuin.dsl.cqrs.common.types.*
 
@@ -57,20 +58,6 @@ context org.fuin.jtenman {
             /** The realm that is still active. */
             String realm
             message "Tenant '${realm}' must be suspended before it can be deleted"
-        }
-
-        /**
-         * An operation was attempted on a tenant that has already been deleted.
-         * <p>
-         * Deleting removes the aggregate as well as recording the fact, so normally the tenant cannot be
-         * reached at all. This covers the window in between: recording the deletion and removing the
-         * aggregate are two calls with no shared transaction, so a tenant can survive its own deletion -
-         * and it must not act afterwards, least of all against a realm that is already gone.
-         */
-        exception TenantAlreadyDeletedException {
-            /** The realm of the deleted tenant. */
-            String realm
-            message "Tenant '${realm}' has been deleted"
         }
 
         /**
@@ -299,14 +286,6 @@ context org.fuin.jtenman {
             }
 
             /**
-             * Makes sure a deleted tenant does nothing further. Every operation carries it, because after
-             * deletion there is no realm left to act on and no state worth changing.
-             */
-            business-rule MustNotBeDeleted exception TenantAlreadyDeletedException {
-                consistency strong
-            }
-
-            /**
              * Registers a new tenant and creates its realm in Keycloak. The realm is created under the
              * rights of the signed-in system administrator - no credential of jtenman's own is involved.
              */
@@ -364,7 +343,7 @@ context org.fuin.jtenman {
              * required actions to set their own credential and receives a one-time link by email. jtenman
              * therefore never holds a working credential for any tenant.
              */
-            method inviteAdministrator business-rules MustNotBeDeleted fires AdministratorInvitedEvent {
+            method inviteAdministrator business-rules EntityMustNotBeDeletedRule fires AdministratorInvitedEvent {
 
                 /**
                  * Where to send the invitation. Used to send it and then forgotten - only the resulting
@@ -408,7 +387,7 @@ context org.fuin.jtenman {
              * its audience.
              */
             method subscribeApplication
-                business-rules MustNotBeDeleted, ApplicationMustBeKnown, ApplicationMustNotBeSubscribed
+                business-rules EntityMustNotBeDeletedRule, ApplicationMustBeKnown, ApplicationMustNotBeSubscribed
                 fires ApplicationSubscribedEvent {
 
                 /** The application to grant access to. */
@@ -459,7 +438,7 @@ context org.fuin.jtenman {
              * live access again as soon as anything trusts the audience by itself.
              */
             method unsubscribeApplication
-                business-rules MustNotBeDeleted, ApplicationMustBeSubscribed
+                business-rules EntityMustNotBeDeletedRule, ApplicationMustBeSubscribed
                 fires ApplicationUnsubscribedEvent {
 
                 /** The application to withdraw access to. */
@@ -491,7 +470,7 @@ context org.fuin.jtenman {
              * Revokes the tenant's access everywhere at once and disables its realm, without touching
              * its subscriptions.
              */
-            method suspendTenant business-rules MustNotBeDeleted fires TenantSuspendedEvent {
+            method suspendTenant business-rules EntityMustNotBeDeletedRule fires TenantSuspendedEvent {
 
                 /** Why the tenant is being suspended. */
                 SuspensionReason reason
@@ -526,7 +505,7 @@ context org.fuin.jtenman {
              * forces access to be revoked and the revocation to reach every application before anything
              * is destroyed, and it turns an accident into two deliberate steps with a pause between them.
              */
-            method deleteTenant business-rules MustNotBeDeleted, MustBeSuspended fires TenantDeletedEvent {
+            method deleteTenant business-rules EntityMustNotBeDeletedRule, MustBeSuspended fires TenantDeletedEvent {
 
                 /** Why the tenant is being deleted. */
                 SuspensionReason reason
@@ -553,7 +532,7 @@ context org.fuin.jtenman {
             /**
              * Makes a suspended tenant usable again, restoring exactly the subscriptions it had.
              */
-            method resumeTenant business-rules MustNotBeDeleted fires TenantResumedEvent {
+            method resumeTenant business-rules EntityMustNotBeDeletedRule fires TenantResumedEvent {
 
                 operation-context ResumeTenantService
 

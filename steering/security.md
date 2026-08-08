@@ -193,7 +193,8 @@ exactly the audit trail you want to survive. `purge` would be the right call whe
 holds the personal data. That is not this aggregate.
 
 What stops a deleted tenant from acting is therefore the model, not the absence of a stream: **every
-operation carries a `MustNotBeDeleted` rule** and a deleted tenant answers `TenantAlreadyDeletedException`
+operation carries the shared `EntityMustNotBeDeletedRule`** and a deleted tenant answers
+`EntityInStateDeletedException`
 to all of them. That is where the invariant belongs. Had it been left to stream removal, the only thing
 stopping a deleted tenant would be Keycloak answering 404 for a realm that no longer exists -
 infrastructure accidentally enforcing a domain invariant, and reporting it as a server error.

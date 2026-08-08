@@ -2,12 +2,13 @@ package org.fuin.jtenman.command.core.handler.tenants;
 
 import org.fuin.ddd4j.core.AggregateDeletedException;
 import org.fuin.ddd4j.core.AggregateNotFoundException;
-import org.fuin.jtenman.shared.domain.tenants.TenantAlreadyDeletedException;
 import org.fuin.cqrs4j.core.CommandExecutionContext;
 import org.fuin.cqrs4j.core.CommandExecutionFailedException;
 import org.fuin.cqrs4j.core.CommandHandler;
 import org.fuin.cqrs4j.core.Result;
 import org.fuin.cqrs4j.jackson.SimpleResult;
+import org.fuin.ddd4j.core.EntityIdPath;
+import org.fuin.dsl.cqrs.common.exceptions.EntityInStateDeletedException;
 import org.fuin.jtenman.command.api.tenants.ResumeTenantCommand;
 import org.fuin.jtenman.command.core.domain.tenants.AbstractTenant.ResumeTenantService;
 import org.fuin.jtenman.command.core.domain.tenants.Tenant;
@@ -52,8 +53,8 @@ public class ResumeTenantCommandHandler implements CommandHandler<ResumeTenantCo
             return SimpleResult.ok();
         } catch (final AggregateNotFoundException | AggregateDeletedException ex) {
             // The tenant is gone. That is an answer the caller can act on, not a server fault.
-            return new SimpleResult(new TenantAlreadyDeletedException(cmd.getAggregateRootId().asBaseType()));
-        } catch (final TenantAlreadyDeletedException ex) {
+            return new SimpleResult(new EntityInStateDeletedException(new EntityIdPath(cmd.getAggregateRootId())));
+        } catch (final EntityInStateDeletedException ex) {
             // Survived its own deletion - see Tenant.requireNotDeleted().
             return new SimpleResult(ex);
         } catch (final Exception ex) {

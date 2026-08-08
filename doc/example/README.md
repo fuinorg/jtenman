@@ -124,5 +124,5 @@ it, and Keycloak's built-in `admin-cli` does not emit the `jtenman-api` audience
 
 **A realm name is retired once its tenant is deleted.** `deleteTenant` removes the realm in Keycloak, but
 the aggregate and its event stream stay - marked deleted, answering every further command with
-`TenantAlreadyDeletedException`. Registering the same realm again is therefore refused with "A tenant is
+`EntityInStateDeletedException`. Registering the same realm again is therefore refused with "A tenant is
 already registered". The script invents a fresh realm per run - set `REALM` to pin it.

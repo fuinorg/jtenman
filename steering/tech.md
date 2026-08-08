@@ -132,7 +132,7 @@ transaction - two rules follow:
   applies its event: if the realm is not created there is nothing to record, whereas a recorded tenant
   without a realm can never be reached.
 - **State the invariant in the model, not only in the sequence.** `deleteTenant` removes the realm and
-  records the deletion; what stops a deleted tenant from acting afterwards is the `MustNotBeDeleted` rule
+  records the deletion; what stops a deleted tenant from acting afterwards is the shared `EntityMustNotBeDeletedRule`
   every operation carries, not the disappearance of anything. Sequencing makes the normal path right; the
   rule is what holds when a later call arrives anyway.
 - **A delete command deletes nothing but the external resource.** Never call `repository.delete(..)` or
