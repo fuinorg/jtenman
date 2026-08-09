@@ -1,6 +1,6 @@
 package org.fuin.jtenman.query.starter;
 
-import org.fuin.jtenman.starter.common.EventStoreProperties;
+import org.fuin.jtenman.internal.EventStoreProperties;
 import io.kurrent.dbclient.KurrentDBClientSettings;
 import io.kurrent.dbclient.KurrentDBProjectionManagementClient;
 import org.fuin.esc.api.ProjectionAdminEventStore;

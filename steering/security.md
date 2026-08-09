@@ -26,7 +26,7 @@ jtenman uses the same Keycloak starter as an administered application, but is **
 - `spring.security.oauth2.resourceserver.jwt.audiences=jtenman-api` - the starter refuses to start
   without it
 - **`SingleRealmTenantRepository`** pinned to the administration realm, declared by
-  `SingleRealmTenantAutoConfiguration` in `starter-common`
+  `SingleRealmTenantAutoConfiguration` in `internal`
 
 That last one is not optional. `KeycloakTenantRepository` discovers realms on demand **regardless of the
 multitenancy flag**, so without replacing it jtenman would accept a token from any realm of the Keycloak
@@ -50,14 +50,14 @@ realm of this Keycloak instance is rejected
 `SingleRealmTenantAutoConfigurationTest` asserts the part that would otherwise regress unnoticed: loaded
 beside the keycloak starter, exactly one `JwtTenantRepository` remains and it is the single-realm one.
 
-**`starter-common` is jtenman-internal.** An application administered *by* jtenman must keep the
-discovering - later the jtenman-fed - repository; pinning it to one realm would make it reject every one
-of its own tenants. That is why the keycloak starter is a `provided` dependency there rather than a
-compile one, so it cannot travel to a consumer through `jtenman-query-starter`.
+**`jtenman-internal` is, as the name says, internal.** An application administered *by* jtenman needs the
+jtenman-fed repository of `jtenman-starter`; pinning it to one realm would make it reject every one of
+its own tenants. That is why the keycloak starter is a `provided` dependency there rather than a compile
+one, so it cannot travel to a consumer.
 
 ## Access is restricted to a `tenant-admin` realm role
 
-`ControlPlaneSecurityAutoConfiguration` in `starter-common` is the only `SecurityFilterChain` a jtenman
+`ControlPlaneSecurityAutoConfiguration` in `internal` is the only `SecurityFilterChain` a jtenman
 deployable has:
 
 | Path            | Requires                            | In practice                          |
@@ -211,6 +211,50 @@ rejected too. That is why `unsubscribeApplication` removes the Keycloak client a
 leaving the client behind keeps a realm able to mint tokens with that audience, which becomes live access
 again the moment anything trusts the audience by itself.
 
+## The replica an application polls: `jtenman-starter`
+
+The first layer above is a *replica*, and `jtenman-starter` is what maintains it. An administered
+application adds that one module, names itself and points it at jtenman:
+
+```yaml
+jtenman:
+  registry:
+    url: https://jtenman.example.com
+    application: billing
+```
+
+It declares a `JwtTenantRepository` fed by the tenant list, replacing the Keycloak starter's
+`KeycloakTenantRepository`. That default discovers realms on demand and accepts every one of them, which
+is no admission control and no revocation - the hole this whole system exists to close, seen from the
+consuming end.
+
+Four properties of it are security decisions rather than implementation detail:
+
+- **It fails closed.** Before the first successful pull it accepts nobody. An application that cannot ask
+  which realms are its tenants must not fall back to trusting any.
+- **A stale list eventually stops being trusted.** A list that cannot be refreshed is served for
+  `max-staleness` (5 minutes by default) and then dropped. A replicated revocation list is only as good
+  as its age, and serving a snapshot of unbounded age means a suspended tenant keeps working for as long
+  as the outage lasts. Setting the property to zero trades that guarantee for availability; it is the
+  operator's choice, and it has to be an explicit zero.
+- **A tenant leaving the list is announced**, which is what evicts `JwtTenantIssuerValidator`'s and
+  `JwtTenantKeySelector`'s caches. That eviction is the whole of the second revocation layer below.
+  The announcement carries only the tenant id and needs no Keycloak call, so a tenant that disappears is
+  still announced while the identity provider is down - which is exactly when it matters.
+- **No request thread performs I/O.** The list and each tenant's OpenID Connect configuration are fetched
+  on the refresh thread; an issuer that is not on the list is refused by a map lookup. The discovering
+  repository cannot do this - it learns of an issuer only when a token carrying it arrives - and pays for
+  it with a negative cache to stop a slow Keycloak occupying every request thread.
+
+The pull itself needs the `svc-tenant-read` role, so the application declares a `TenantListAuthProvider`.
+It is a seam rather than a property because the token is short lived and has to be obtained: a static
+token in a configuration file is the long-lived credential the rules below exist to avoid. The default
+provider sends nothing, jtenman answers 401 and the list stays empty - loud and closed.
+
+**An unreachable jtenman does not stop an application from starting.** Refusing would tie every
+administered application's rollout to the control plane being up at that moment, and the application is
+not dangerous without the list - it accepts nobody until a pull succeeds.
+
 ## Revocation works in two layers
 
 |                              | Effect                                      | Timing                      |
@@ -219,9 +263,10 @@ again the moment anything trusts the audience by itself.
 | Dropped from the tenant list | applications reject tokens from that issuer | within one refresh interval |
 
 The second stops **already-issued** tokens: the issuer becomes unknown, so validation fails regardless of
-the token's remaining lifetime. It only works against a cqrs-4-java build that evicts
-`JwtTenantIssuerValidator`'s and `JwtTenantKeySelector`'s caches on `TenantRemovedEvent`; an older build
-caches a resolved issuer forever and revokes nothing.
+the token's remaining lifetime. Two things have to hold for it, and both do - `jtenman-starter` announces
+the removal, and the cqrs-4-java build in use evicts `JwtTenantIssuerValidator`'s and
+`JwtTenantKeySelector`'s caches on `TenantRemovedEvent`. An older cqrs-4-java caches a resolved issuer
+forever and revokes nothing, so the version matters as much as the wiring.
 
 `suspendTenant` is the emergency lever: it removes the tenant from every application at once **without
 touching its subscriptions**, so `resumeTenant` restores exactly the previous set.

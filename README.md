@@ -10,6 +10,56 @@ Keycloak realm, records which applications the tenant may use, and provisions ea
 Keycloak clients. Applications do not administer tenants; they replicate the resulting list and use it to
 decide which token issuers they trust.
 
+> :information_source: **[`jtenman-starter`](starter/README.md) is the only module you add to your own
+> application.** Everything else in this repository is jtenman itself - its aggregate, its projection,
+> its deployables - and none of it belongs on your class path. `jtenman-shared` and `jtenman-query-api`
+> are published too, but only because the starter brings them along.
+
+## Integrating it
+
+**1. Add the starter.**
+
+```xml
+<dependency>
+    <groupId>org.fuin</groupId>
+    <artifactId>jtenman-starter</artifactId>
+    <version>${jtenman-starter.version}</version>
+</dependency>
+```
+(Define a `jtenman-starter.version` variable with latest available version)
+
+**2. Point it at jtenman and name yourself.** The `application` is your id in jtenman's catalogue, and it
+decides which tenants you get - naming somebody else's id replicates their list. Neither setting has a
+default.
+
+```yaml
+jtenman:
+  registry:
+    url: https://jtenman.example.com
+    application: billing
+```
+
+**3. Supply the token the tenant list is fetched with.** jtenman requires a role on that endpoint, so
+declare a `TenantListAuthProvider` bean returning a client-credentials token of the `svc-tenant-read`
+service account. Without one the pull is unauthenticated, jtenman answers 401, and your application
+accepts nobody.
+
+**4. Get registered.** An administrator adds your application to jtenman's catalogue and subscribes each
+tenant to it with `subscribeApplication`, which also creates your Keycloak client and its audience
+mapper. Until that has run for a tenant, its tokens carry only Keycloak's default audience and you reject
+them - a clean 401 rather than partial access.
+
+That is the whole integration. The starter supplies a `JwtTenantRepository` fed by jtenman's tenant list,
+replacing the realm-discovering default, so everything downstream - issuer validation, key selection,
+per-tenant datasource routing, projections - keeps working unchanged. It refreshes on a loop, so a tenant
+jtenman drops stops being accepted within one refresh interval, and it fails closed: no list, nobody
+accepted.
+
+Two independent checks then guard every request: **jtenman** says which realms are tenants of this
+application, and the **audience** in the token says it was issued for this application.
+
+See [starter/README.md](starter/README.md) for the settings and the failure modes.
+
 ## Why it exists
 
 Without a control plane, an application using the cqrs-4-java Keycloak starter accepts **any** realm of
@@ -18,29 +68,24 @@ admission control and no revocation. This is the authoritative answer to "which 
 and of which applications" - so an application can both refuse an unknown realm and stop accepting a
 tenant that was suspended, without a restart.
 
-## How an application uses it
-
-An application adds `jtenman-query-starter`, points it at jtenman and names itself. The starter supplies
-a `JwtTenantRepository` that replaces the realm-discovering default, so everything downstream - issuer
-validation, key selection, per-tenant datasource routing, projections - keeps working unchanged.
-
-Two independent checks then guard every request: **jtenman** says which realms are tenants of this
-application, and the **audience** in the token says it was issued for this application.
-
 ## Modules
 
-| Module           | Description                                                                    |
-|------------------|--------------------------------------------------------------------------------|
-| `model`          | The `.cqrs` DSL sources and the SrcGen4J generator. Private - never published. |
-| `shared`         | Value objects, events and ids shared by all three sides.                       |
-| `starter-common` | Spring Boot auto-configuration shared by the three starters.                   |
-| `command`        | Write side: the `Tenant` aggregate and its commands.                           |
-| `query`          | Read side: the tenant projection and the contract applications poll.           |
-| `process`        | Process managers.                                                              |
-| `combined`       | All three sides in one deployable - the normal way to run jtenman.             |
+Every module has a `README.md` of its own; this is the map.
 
-Published artifacts: `jtenman-shared`, `jtenman-command-api`, `jtenman-query-api` and
-`jtenman-query-starter`.
+| Module     | Description                                                                          |
+|------------|--------------------------------------------------------------------------------------|
+| `model`    | The `.cqrs` DSL sources and the SrcGen4J generator. Private - never published.        |
+| `shared`   | Value objects, events and ids shared by all three sides.                              |
+| `internal` | Spring Boot auto-configuration shared by jtenman's own deployables. Never a consumer's. |
+| `command`  | Write side: the `Tenant` aggregate and its commands.                                  |
+| `query`    | Read side: the tenant projection and the contract applications poll.                  |
+| `process`  | Process managers. Empty so far.                                                       |
+| `starter`  | **The one module an administered application adds.**                                  |
+| `combined` | All three sides in one deployable - the normal way to run jtenman.                    |
+
+Published: `jtenman-starter`, the one you add; `jtenman-shared` and `jtenman-query-api`, which it brings
+with it; and `jtenman-command-api`, for a client that sends jtenman its commands rather than consuming
+its tenants.
 
 ## Building
 
@@ -66,3 +111,5 @@ Ports are `909x` so jtenman can run beside the applications it administers, whic
 - [steering/product.md](steering/product.md) - what jtenman is for
 - [steering/tech.md](steering/tech.md) - technology stack and conventions
 - [steering/security.md](steering/security.md) - authentication, authorization, provisioning
+- [steering/security-plan.md](steering/security-plan.md) - the security work still ahead
+- [doc/example/README.md](doc/example/README.md) - the life of a tenant, end to end

@@ -11,12 +11,12 @@ jtenman                 (pom, root parent)
 ├── steering            (non-Maven)          # Product, technology and security documentation
 ├── model               (jar)                # CQRS model files and SrcGen4J generator - NOT published
 ├── shared              (jar)                # code shared across the command, query and process sides
-├── starter-common      (jar)                # Spring Boot auto-configuration shared by the starters
+├── internal            (jar)                # Spring Boot auto-configuration shared by jtenman's own starters
 ├── query               (pom, aggregator)    # read side
 │   ├── api             (jar)                # public query contracts - published
 │   ├── core            (jar)                # projection logic
 │   ├── server          (jar)                # runnable server for the query side
-│   └── starter         (jar)                # auto-configuration; also what a CONSUMER adds
+│   └── starter         (jar)                # auto-configuration for jtenman's own read side
 ├── command             (pom, aggregator)    # write side
 │   ├── api             (jar)                # command messages - published
 │   ├── core            (jar)                # the Tenant aggregate
@@ -24,17 +24,20 @@ jtenman                 (pom, root parent)
 │   └── starter         (jar)
 ├── process             (pom, aggregator)    # process managers
 │   ├── api / core / server / starter
+├── starter             (jar)                # what a CONSUMER adds - published
 └── combined            (jar)                # all three sides in one deployable
 ```
 
 `command/api` and `query/api` are generated-only; their `src/main/java` exists with a `.gitkeep` so
 hand-written code can be added later without a structural change.
 
+Every module carries a `README.md` saying in a sentence or two what it is.
+
 ### Publishing
 
 The DSL is private: nothing outside jtenman imports the model, so `model` is **not deployed**
 (`maven-deploy-plugin` skipped) and all `.cqrs` files live in `model/private/`. Published:
-`jtenman-shared`, `jtenman-command-api`, `jtenman-query-api`, `jtenman-query-starter`.
+`jtenman-shared`, `jtenman-command-api`, `jtenman-query-api`, `jtenman-starter`.
 
 ## Naming Conventions
 

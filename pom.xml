@@ -116,7 +116,7 @@
 
             <dependency>
                 <groupId>org.fuin</groupId>
-                <artifactId>jtenman-starter-common</artifactId>
+                <artifactId>jtenman-internal</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -171,6 +171,12 @@
             <dependency>
                 <groupId>org.fuin</groupId>
                 <artifactId>jtenman-process-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -258,10 +264,11 @@
     <modules>
         <module>model</module>
         <module>shared</module>
-        <module>starter-common</module>
+        <module>internal</module>
         <module>query</module>
         <module>command</module>
         <module>process</module>
+        <module>starter</module>
         <module>combined</module>
     </modules>
 

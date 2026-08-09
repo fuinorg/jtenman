@@ -31,7 +31,7 @@
 
         <dependency>
             <groupId>org.fuin</groupId>
-            <artifactId>jtenman-starter-common</artifactId>
+            <artifactId>jtenman-internal</artifactId>
         </dependency>
 
         <!-- compile -->

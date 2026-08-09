@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.fuin</groupId>
+        <artifactId>jtenman</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>jtenman-internal</artifactId>
+
+    <name>jtenman-internal</name>
+    <description>Spring Boot auto-configuration shared by jtenman's own deployables - never added by a consuming application</description>
+
+    <dependencies>
+
+        <!-- compile -->
+
+        <!-- The value objects whose Jackson (de)serializers are registered on the mapper. -->
+        <dependency>
+            <groupId>org.fuin</groupId>
+            <artifactId>jtenman-shared</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.objects4j</groupId>
+            <artifactId>objects4j-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.objects4j</groupId>
+            <artifactId>objects4j-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.ddd4j</groupId>
+            <artifactId>ddd-4-java-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.ddd4j</groupId>
+            <artifactId>ddd-4-java-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.cqrs4j</groupId>
+            <artifactId>cqrs-4-java-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.esc</groupId>
+            <artifactId>esc-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.esc</groupId>
+            <artifactId>esc-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.esc</groupId>
+            <artifactId>esc-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.esc</groupId>
+            <artifactId>esc-esgrpc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.kurrent</groupId>
+            <artifactId>kurrentdb-client</artifactId>
+        </dependency>
+
+        <!-- SingleRealmTenantRepository, which pins jtenman's trust boundary to one realm. -->
+        <dependency>
+            <groupId>org.fuin.cqrs4j</groupId>
+            <artifactId>cqrs-4-java-springboot-keycloak-core</artifactId>
+        </dependency>
+
+        <!-- provided -->
+
+        <!-- Referenced only by the 'before' attribute of SingleRealmTenantAutoConfiguration, so it is
+             needed to compile and to test but must not become a transitive dependency: the deployables
+             declare the keycloak starter themselves, and an application administered by jtenman must
+             never inherit it from here. -->
+        <dependency>
+            <groupId>org.fuin.cqrs4j</groupId>
+            <artifactId>cqrs-4-java-springboot-keycloak-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- HttpSecurity and SecurityFilterChain, for ControlPlaneSecurityAutoConfiguration. Provided
+             for the same reason as the keycloak starter above: every deployable brings
+             spring-boot-starter-oauth2-resource-server itself, and nothing that consumes a jtenman
+             starter should inherit the control plane's own security stack from here. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-config</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- test -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Spring MVC and the servlet container API, so ControlPlaneSecurityAutoConfigurationTest can
+             load the chain in a real servlet web context. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+
+        <plugins>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Automatic-Module-Name>org.fuin.jtenman.internal</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+</project>
