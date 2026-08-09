@@ -102,9 +102,14 @@
         </dependency>
 
         <!-- SingleRealmTenantRepository, which pins jtenman's trust boundary to one realm. -->
+        <!--
+            The security chain and the single-realm trust boundary, both of which jtenman used to carry
+            itself. Its authorization rules are now cqrs4j.security.rules in each deployable's
+            application.yml - see steering/security.md.
+        -->
         <dependency>
             <groupId>org.fuin.cqrs4j</groupId>
-            <artifactId>cqrs-4-java-springboot-keycloak-core</artifactId>
+            <artifactId>cqrs-4-java-springboot-security</artifactId>
         </dependency>
 
         <!-- provided -->
@@ -113,27 +118,12 @@
              needed to compile and to test but must not become a transitive dependency: the deployables
              declare the keycloak starter themselves, and an application administered by jtenman must
              never inherit it from here. -->
-        <dependency>
-            <groupId>org.fuin.cqrs4j</groupId>
-            <artifactId>cqrs-4-java-springboot-keycloak-starter</artifactId>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- HttpSecurity and SecurityFilterChain, for ControlPlaneSecurityAutoConfiguration. Provided
              for the same reason as the keycloak starter above: every deployable brings
              spring-boot-starter-oauth2-resource-server itself, and nothing that consumes a jtenman
              starter should inherit the control plane's own security stack from here. -->
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-config</artifactId>
-            <scope>provided</scope>
-        </dependency>
 
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-web</artifactId>
-            <scope>provided</scope>
-        </dependency>
 
         <!-- test -->
 

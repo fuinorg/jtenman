@@ -123,13 +123,23 @@ class ControlPlaneAuthorizationIT {
     }
 
     /**
-     * Health is authenticated but needs no role, which is why {@code doc/example/run-example.sh} sends a
-     * token just to check whether jtenman is up.
+     * Health answers without a token.
+     * <p>
+     * <b>This changed</b> when jtenman adopted the shared chain from
+     * {@code cqrs-4-java-springboot-security}: it used to require one. The reason to change it is that a
+     * container orchestrator's probe has no token, so an authenticated health endpoint makes the
+     * liveness check either impossible or a place to put a credential. Opening it is a decision, made
+     * here rather than inherited by accident - the shared chain's {@code permit-actuator} can close it
+     * again in one line.
+     * <p>
+     * A token still works, which is what keeps {@code doc/example/run-example.sh} valid.
      */
     @Test
-    void healthIsAuthenticatedButNeedsNoRole() {
+    void healthAnswersWithAndWithoutAToken() {
 
-        assertThat(get(HEALTH_PATH, null).getStatusCode().value()).isEqualTo(401);
+        final ResponseEntity<String> anonymous = get(HEALTH_PATH, null);
+        assertThat(anonymous.getStatusCode().value()).isEqualTo(200);
+        assertThat(anonymous.getBody()).contains("\"status\":\"UP\"");
 
         final ResponseEntity<String> response = get(HEALTH_PATH, NO_ROLE);
         assertThat(response.getStatusCode().value()).isEqualTo(200);

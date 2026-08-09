@@ -43,3 +43,21 @@ management:
       exposure:
         # Everything beyond health/info stays closed - see steering/security.md.
         include: health,info
+
+# Who may reach what. Enforced by cqrs-4-java-springboot-security, which builds jtenman's one
+# SecurityFilterChain from this - the chain used to be hand-written here as
+# ControlPlaneSecurityAutoConfiguration, together with a near-identical copy in every other project.
+#
+# Order matters, exactly as in Spring Security: the first matching rule decides. Anything no rule
+# mentions still needs a valid token, and that default cannot be turned off - there is deliberately
+# no way to open a path from YAML.
+#
+# 'permit-actuator' defaults to true, so health and info answer without a token. That is a change:
+# the hand-written chain required one for them.
+cqrs4j:
+  security:
+    rules:
+      - paths: [ "/cmd/**" ]
+        has-any-role: [ tenant-admin ]
+      - paths: [ "/view/**" ]
+        has-any-role: [ tenant-admin, svc-tenant-read ]

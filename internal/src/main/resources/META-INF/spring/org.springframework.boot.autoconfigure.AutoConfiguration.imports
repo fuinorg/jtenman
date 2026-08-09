@@ -1,3 +1,1 @@
 org.fuin.jtenman.internal.EventStoreAutoConfiguration
-org.fuin.jtenman.internal.SingleRealmTenantAutoConfiguration
-org.fuin.jtenman.internal.ControlPlaneSecurityAutoConfiguration

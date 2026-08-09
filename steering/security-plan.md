@@ -13,8 +13,8 @@ Checkable from source rather than from another document:
 
 |                         | State                                                                                                                                                                          |
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Trust boundary          | **Done.** `SingleRealmTenantAutoConfiguration` pins jtenman to the administration realm.                                                                                       |
-| `tenant-admin` role     | **Done.** `ControlPlaneSecurityAutoConfiguration` is the only filter chain a deployable has, and `ArchitectureTest` keeps a permit-all chain out of production sources.         |
+| Trust boundary          | **Done.** `SingleRealmTenantAutoConfiguration`, now from `cqrs-4-java-springboot-security`, pins jtenman to the administration realm.                                                                                       |
+| `tenant-admin` role     | **Done.** The shared chain from `cqrs-4-java-springboot-security` is the only one a deployable has, and its rules are `cqrs4j.security.rules` in `application.yml`; `ArchitectureTest` keeps a permit-all chain out of production sources.         |
 | Consumer-facing starter | **Done.** `jtenman-starter` replicates the tenant list into a `JwtTenantRepository` and fails closed before the first pull and after `max-staleness`.                           |
 | `svc-tenant-read`       | **Done.** `ClientCredentialsTenantListAuthProvider` fetches the list as the service account; `setup-keycloak.sh` provisions role, group, confidential client and audience mapper. |
 | `svc-command-dispatch`  | **Not applicable.** It authenticates outbox delivery and jtenman has no process side. The rule stands in `security.md` for applications that do.                               |

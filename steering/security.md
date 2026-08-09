@@ -26,7 +26,8 @@ jtenman uses the same Keycloak starter as an administered application, but is **
 - `spring.security.oauth2.resourceserver.jwt.audiences=jtenman-api` - the starter refuses to start
   without it
 - **`SingleRealmTenantRepository`** pinned to the administration realm, declared by
-  `SingleRealmTenantAutoConfiguration` in `internal`
+  `SingleRealmTenantAutoConfiguration` in `cqrs-4-java-springboot-security` - the default there, so
+  jtenman gets it by adding the dependency
 
 That last one is not optional. `KeycloakTenantRepository` discovers realms on demand **regardless of the
 multitenancy flag**, so without replacing it jtenman would accept a token from any realm of the Keycloak
@@ -47,18 +48,19 @@ Tenant trust boundary pinned to the single issuer 'http://localhost:8180/realms/
 realm of this Keycloak instance is rejected
 ```
 
-`SingleRealmTenantAutoConfigurationTest` asserts the part that would otherwise regress unnoticed: loaded
-beside the keycloak starter, exactly one `JwtTenantRepository` remains and it is the single-realm one.
+The shared module's own tests assert the part that would otherwise regress unnoticed: loaded beside the
+keycloak starter, exactly one `JwtTenantRepository` remains and it is the single-realm one.
 
-**`jtenman-internal` is, as the name says, internal.** An application administered *by* jtenman needs the
+**This is not what an administered application wants.** One administered *by* jtenman needs the
 jtenman-fed repository of `jtenman-starter`; pinning it to one realm would make it reject every one of
-its own tenants. That is why the keycloak starter is a `provided` dependency there rather than a compile
-one, so it cannot travel to a consumer.
+its own tenants. Such an application sets `cqrs4j.security.tenants: discover`, or simply declares its own
+`JwtTenantRepository`, which both the shared module and the keycloak starter back off from.
 
 ## Access is restricted to a `tenant-admin` realm role
 
-`ControlPlaneSecurityAutoConfiguration` in `internal` is the only `SecurityFilterChain` a jtenman
-deployable has:
+jtenman has one `SecurityFilterChain`, and since the extraction it is
+`cqrs-4-java-springboot-security`'s, built from `cqrs4j.security.rules` in each deployable's
+`application.yml`:
 
 | Path            | Requires                            | In practice                          |
 |-----------------|-------------------------------------|--------------------------------------|
@@ -98,11 +100,14 @@ because the production chain calls `anyRequest()` too and a legitimate chain may
 and it has no exception: jtenman ships no development profile, so there is nowhere such a chain belongs
 outside a test. One copy per deployable rather than one shared, because each scans its own classpath.
 
-Three tests carry the rule itself. `ControlPlaneSecurityAutoConfigurationTest` drives real requests
-through the real chain - no token is a 401, a token without the role a 403, a client role a 403.
-`ControlPlaneAuthorizationIT` repeats it over HTTP against the deployable's own controllers, which
-matters because `TenantController` is regenerated on every build and its mapping is not something review
-can rely on staying put. `ArchitectureTest` guards the escape hatch above.
+Two tests carry the rule itself, and the shared module carries a third. `ControlPlaneAuthorizationIT`
+drives it over HTTP against the deployable's own controllers - no token is a 401, a token without the
+role a 403 - which matters because `TenantController` is regenerated on every build and its mapping is
+not something review can rely on staying put. `ArchitectureTest` guards the escape hatch above, using the
+shared rule from `cqrs-4-java-test-helper`; the copy this repository used to carry had drifted to a
+two-clause predicate that reports a real chain as a blanket bypass. And
+`cqrs-4-java-springboot-security`'s own tests prove that a rule in YAML becomes the enforcement, so this
+repository does not have to.
 
 ## Provisioning runs as the signed-in administrator
 
