@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test-only persistence unit. The application itself is configured by Spring Boot; this exists so the
+  projection and the read service can be driven against a real database without starting Spring.
+
+  Entities are listed explicitly rather than scanned: a test should fail because the code under test is
+  wrong, not because an unrelated context's mapping does not build.
+-->
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="3.0">
+
+    <persistence-unit name="jtenman-query-test" transaction-type="RESOURCE_LOCAL">
+
+        <class>org.fuin.jtenman.query.core.view.tenants.tenantview.TenantEntity</class>
+        <class>org.fuin.jtenman.query.core.view.tenants.tenantview.TenantApplicationEntity</class>
+        <exclude-unlisted-classes>true</exclude-unlisted-classes>
+
+        <properties>
+            <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>
+            <!-- One in-memory database per test, dropped when the last connection closes. -->
+            <property name="jakarta.persistence.jdbc.url"
+                      value="jdbc:h2:mem:jtenman-query-test;DB_CLOSE_DELAY=0"/>
+            <property name="jakarta.persistence.jdbc.user" value="sa"/>
+            <property name="jakarta.persistence.jdbc.password" value=""/>
+            <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
+            <property name="hibernate.show_sql" value="false"/>
+        </properties>
+
+    </persistence-unit>
+
+</persistence>

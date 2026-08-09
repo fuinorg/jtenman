@@ -92,6 +92,9 @@
 					<emf:artifact-factory artifact="view" class="org.fuin.dsl.ddd.gen.view.ViewArtifactFactory" />
 					<emf:artifact-factory artifact="viewSpringApi" class="org.fuin.dsl.ddd.gen.view.ViewSpringApiArtifactFactory" />
 					<emf:artifact-factory artifact="viewQuarkusApi" class="org.fuin.dsl.ddd.gen.view.ViewQuarkusApiArtifactFactory" />
+					<emf:artifact-factory artifact="viewService" class="org.fuin.dsl.ddd.gen.view.ViewServiceApiArtifactFactory" />
+					<emf:artifact-factory artifact="viewServiceRestClient" class="org.fuin.dsl.ddd.gen.view.ViewServiceRestClientArtifactFactory" />
+					<emf:artifact-factory artifact="viewRestDelegate" class="org.fuin.dsl.ddd.gen.view.ViewRestDelegateArtifactFactory" />
 					<emf:artifact-factory artifact="finalView" class="org.fuin.dsl.ddd.gen.view.FinalViewArtifactFactory" />
 					<emf:artifact-factory artifact="jpaViewTable" class="org.fuin.dsl.ddd.gen.view.JpaViewTableArtifactFactory" />
 

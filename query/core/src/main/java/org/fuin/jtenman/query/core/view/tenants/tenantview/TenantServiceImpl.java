@@ -1,7 +1,7 @@
 package org.fuin.jtenman.query.core.view.tenants.tenantview;
 
 import jakarta.persistence.EntityManager;
-import org.fuin.jtenman.query.api.view.tenants.tenantview.TenantControllerApi;
+import org.fuin.jtenman.query.api.view.tenants.tenantview.TenantService;
 import org.fuin.jtenman.shared.domain.tenants.ApplicationId;
 import org.fuin.jtenman.shared.domain.tenants.IssuerUri;
 import org.fuin.jtenman.shared.domain.tenants.RealmName;
@@ -10,31 +10,36 @@ import org.fuin.jtenman.shared.domain.tenants.TenantRealmId;
 import org.fuin.jtenman.shared.domain.tenants.TenantStatus;
 import org.fuin.ddd4j.core.EntityIdPath;
 import org.fuin.dsl.cqrs.common.basics.VersionedEntityIdPath;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
- * REST controller providing the Tenant read model. Implements {@link TenantControllerApi} and adds
- * {@code @RestController} (required - not inherited from the interface).
+ * Answers the Tenant read model's queries against the database. Implements {@link TenantService},
+ * which the generated TenantController exposes over REST and a caller in this JVM uses directly.
  * <p>
- * This is the contract consuming applications poll to keep their local tenant replica current, so it is
- * a machine interface: its shape and its path are part of jtenman's published API.
+ * What consuming applications poll to keep their local tenant replica current reaches them through that
+ * controller, so the REST shape and path stay part of jtenman's published API - they are just no longer
+ * declared here.
  */
-@RestController
 @Transactional(readOnly = true)
-public class TenantController implements TenantControllerApi {
+public class TenantServiceImpl implements TenantService {
 
-    @Autowired
-    private EntityManager em;
+    private final EntityManager em;
+
+    /**
+     * Constructor with all mandatory dependencies. A single constructor is autowired implicitly, and it
+     * is what lets a test drive this service against an in-memory database without starting Spring.
+     *
+     * @param em Entity manager of the read model.
+     */
+    public TenantServiceImpl(final EntityManager em) {
+        this.em = Objects.requireNonNull(em, "em==null");
+    }
 
     @Override
-    public ResponseEntity<List<TenantDetails>> listByApplication(
-            @RequestParam("application") final ApplicationId application) {
+    public List<TenantDetails> listByApplication(final ApplicationId application) {
 
         // Only ACTIVE tenants are returned. Handing out a suspended one and trusting every caller to
         // filter would make one forgotten check anywhere in the system into live access for a tenant
@@ -48,7 +53,7 @@ public class TenantController implements TenantControllerApi {
                 .setParameter("status", TenantStatus.ACTIVE.name())
                 .getResultList();
 
-        return ResponseEntity.ok(rows.stream().map(TenantController::toDetails).toList());
+        return rows.stream().map(TenantServiceImpl::toDetails).toList();
     }
 
     private static TenantDetails toDetails(final Object[] row) {
