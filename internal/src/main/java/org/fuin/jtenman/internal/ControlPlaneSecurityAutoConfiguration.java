@@ -51,8 +51,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * of {@code jtenman-cli} produces a 403 with a Keycloak setup that looks correct.
  * <p>
  * Like {@link SingleRealmTenantAutoConfiguration} this is an auto-configuration rather than something
- * each deployable imports: all four reach it through their jtenman starter, and a fifth added later gets
- * it without anyone remembering to. It has to be ordered <b>before</b> {@link SecurityAutoConfiguration}
+ * each deployable imports: every one reaches it through its jtenman starter, and one added later gets it
+ * without anyone remembering to. It has to be ordered <b>before</b> {@link SecurityAutoConfiguration}
  * and {@link OAuth2ResourceServerAutoConfiguration}, whose own chains are
  * {@code @ConditionalOnDefaultWebSecurity} - that is {@code @ConditionalOnMissingBean(SecurityFilterChain)}
  * - and therefore have to see this one already registered to back off.

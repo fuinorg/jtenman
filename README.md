@@ -79,7 +79,6 @@ Every module has a `README.md` of its own; this is the map.
 | `internal` | Spring Boot auto-configuration shared by jtenman's own deployables. Never a consumer's. |
 | `command`  | Write side: the `Tenant` aggregate and its commands.                                  |
 | `query`    | Read side: the tenant projection and the contract applications poll.                  |
-| `process`  | Process managers. Empty so far.                                                       |
 | `starter`  | **The one module an administered application adds.**                                  |
 | `combined` | All three sides in one deployable - the normal way to run jtenman.                    |
 
@@ -104,7 +103,7 @@ mvn -pl :jtenman-combined spring-boot:run
 ```
 
 Ports are `909x` so jtenman can run beside the applications it administers, which use `808x`:
-`combined` 9090, `command/server` 9091, `query/server` 9092, `process/server` 9093.
+`combined` 9090, `command/server` 9091, `query/server` 9092.
 
 ## Documentation
 

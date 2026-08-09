@@ -57,11 +57,11 @@ still has to be placed until signing moves into a secret store, which is a small
 ## Carry-overs
 
 - Adopt `AuditedRepository` in the seven command handlers — the same audit trail for free.
-- **All four `*ApplicationIT` classes still run permit-all.** They declare their own
+- **The `*ApplicationIT` classes still run permit-all.** They declare their own
   `SecurityFilterChain` so they can reach `/actuator/health` without a Keycloak. That is the documented
-  escape hatch and `ArchitectureTest` fences it, but it does mean those four prove only that the context
+  escape hatch and `ArchitectureTest` fences it, but it does mean they prove only that the context
   starts — `ControlPlaneAuthorizationIT` is the one that proves anything about who may call what. Worth
-  revisiting if a fifth deployable ever copies the pattern without adding an authorization IT beside it.
+  revisiting if another deployable ever copies the pattern without adding an authorization IT beside it.
 - **The tenant list has no end-to-end test against a running jtenman.** `TenantRegistryAutoConfigurationTest`
   drives the real pull over real HTTP, but against a stand-in serving a captured response. The capture was
   verified by hand against a live `combined` — including that an unsubscribed tenant stops being accepted

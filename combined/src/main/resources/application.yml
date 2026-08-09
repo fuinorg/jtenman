@@ -1,5 +1,5 @@
 # jtenman runs on 909x so it can sit beside the applications it administers, which use 808x:
-# combined 9090, command/server 9091, query/server 9092, process/server 9093.
+# combined 9090, command/server 9091, query/server 9092.
 server:
   port: 9090
 

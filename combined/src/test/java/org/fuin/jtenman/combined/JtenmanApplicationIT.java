@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Verifies that the all-in-one deployable - command, query and process in one process - boots and reports itself as healthy. This is the way jtenman is normally run.
+ * Verifies that the all-in-one deployable - command and query in one process - boots and reports itself as healthy. This is the way jtenman is normally run.
  * <p>
  * Only KurrentDB is started as a container: jtenman's read model lives in an in-memory H2 database, and
  * no Keycloak is needed because the security chain is replaced below - what is under test here is that

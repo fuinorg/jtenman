@@ -158,24 +158,6 @@
 
             <dependency>
                 <groupId>org.fuin</groupId>
-                <artifactId>jtenman-process-api</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.fuin</groupId>
-                <artifactId>jtenman-process-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.fuin</groupId>
-                <artifactId>jtenman-process-starter</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.fuin</groupId>
                 <artifactId>jtenman-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -267,7 +249,6 @@
         <module>internal</module>
         <module>query</module>
         <module>command</module>
-        <module>process</module>
         <module>starter</module>
         <module>combined</module>
     </modules>

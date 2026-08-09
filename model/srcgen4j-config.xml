@@ -30,18 +30,15 @@
 	       command.api   -> command messages                          -> command/api
 	       command.core  -> aggregates, entities, services            -> command/core
 	       query.core    -> views / read-model logic                  -> query/core
-	       query.api     -> view API DTOs                             -> query/api
-	       process.core  -> process managers / sagas                  -> process/core -->
+	       query.api     -> view API DTOs                             -> query/api -->
 	<modules>
 		<module name="shared" path="${rootDir}/../shared"/>
 		<module name="command.api" path="${rootDir}/../command/api"/>
 		<module name="command.core" path="${rootDir}/../command/core"/>
 		<module name="query.core" path="${rootDir}/../query/core"/>
 		<module name="query.api" path="${rootDir}/../query/api"/>
-		<module name="process.core" path="${rootDir}/../process/core"/>
 		<module name="command.starter" path="${rootDir}/../command/starter"/>
 		<module name="query.starter" path="${rootDir}/../query/starter"/>
-		<module name="process.starter" path="${rootDir}/../process/starter"/>
 	</modules>
 
 	<parsers>
@@ -65,7 +62,6 @@
 					<variable name="sharedPkgRepl" value="org.fuin.jtenman.shared.domain.$1" />
 					<variable name="commandPkgRepl" value="org.fuin.jtenman.command.core.domain.$1" />
 					<variable name="queryPkgRepl" value="org.fuin.jtenman.query.core.domain.$1" />
-					<variable name="processPkgRepl" value="org.fuin.jtenman.process.core.domain.$1" />
 
 					<!-- Pseudo generator that only adds mapping for "types.cqrs" to Java types -->
 					<emf:artifact-factory artifact="ExternalTypes" class="org.fuin.dsl.ddd.gen.resourceset.CtxExternalTypes"/>
@@ -97,9 +93,6 @@
 					<emf:artifact-factory artifact="viewRestDelegate" class="org.fuin.dsl.ddd.gen.view.ViewRestDelegateArtifactFactory" />
 					<emf:artifact-factory artifact="finalView" class="org.fuin.dsl.ddd.gen.view.FinalViewArtifactFactory" />
 					<emf:artifact-factory artifact="jpaViewTable" class="org.fuin.dsl.ddd.gen.view.JpaViewTableArtifactFactory" />
-
-					<emf:artifact-factory artifact="abstractProcessManager" class="org.fuin.dsl.ddd.gen.processmanager.AbstractProcessManagerArtifactFactory" />
-					<emf:artifact-factory artifact="processManager" class="org.fuin.dsl.ddd.gen.processmanager.ProcessManagerArtifactFactory" />
 
 					<emf:artifact-factory artifact="abstractAggregate" class="org.fuin.dsl.ddd.gen.aggregate.AbstractAggregateArtifactFactory" />
 					<emf:artifact-factory artifact="finalAggregate" class="org.fuin.dsl.ddd.gen.aggregate.FinalAggregateArtifactFactory" />

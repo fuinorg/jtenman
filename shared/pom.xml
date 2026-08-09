@@ -14,7 +14,7 @@
     <artifactId>jtenman-shared</artifactId>
 
     <name>jtenman-shared</name>
-    <description>Code shared across the command, query and process sides</description>
+    <description>Code shared across the command and query sides</description>
 
     <dependencies>
 

@@ -1,5 +1,5 @@
 # The standalone query server. See combined/src/main/resources/application.yml for the port map.
-# combined 9090, command/server 9091, query/server 9092, process/server 9093.
+# combined 9090, command/server 9091, query/server 9092.
 server:
   port: 9092
 

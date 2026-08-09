@@ -33,9 +33,9 @@ multitenancy flag**, so without replacing it jtenman would accept a token from a
 instance - including a realm it just created for a tenant. The control plane would inherit the exact bug
 it exists to fix.
 
-It is an **auto-configuration**, not something each deployable imports: all four (combined,
-command/server, query/server, process/server) reach it through their jtenman starter, and a fifth added
-later gets it without anyone remembering to. A forgotten import would leave a silently discovering
+It is an **auto-configuration**, not something each deployable imports: every one (combined,
+command/server, query/server) reaches it through its jtenman starter, and one added later gets it
+without anyone remembering to. A forgotten import would leave a silently discovering
 repository, which is the one failure this is here to prevent. It is ordered `before`
 `KeycloakSecurityAutoConfiguration`, whose own repository bean is
 `@ConditionalOnMissingBean(JwtTenantRepository.class)` and has to see this one already registered to back
@@ -90,14 +90,13 @@ below). Until it is provisioned the read side is reachable with a `tenant-admin`
 `doc/example/run-example.sh` uses.
 
 The chain is `@ConditionalOnMissingBean(SecurityFilterChain.class)`, so an application-supplied chain
-replaces it whole. That is what the four `*ApplicationIT` classes use to boot without a Keycloak, and it
+replaces it whole. That is what the `*ApplicationIT` classes use to boot without a Keycloak, and it
 is the one way this rule can be lost: a permit-all chain left outside test scope would silently take over
 - the application still starts, still validates tokens, still looks configured, and no longer checks a
-role. **`ArchitectureTest`, in each of the four deployables, refuses to let that reach production
-sources.** It matches a class that calls both `anyRequest()` and `permitAll()` - neither half alone,
+role. **`ArchitectureTest`, in each deployable, refuses to let that reach production sources.** It matches a class that calls both `anyRequest()` and `permitAll()` - neither half alone,
 because the production chain calls `anyRequest()` too and a legitimate chain may permit a single path -
 and it has no exception: jtenman ships no development profile, so there is nowhere such a chain belongs
-outside a test. Four copies rather than one, because each deployable scans its own classpath.
+outside a test. One copy per deployable rather than one shared, because each scans its own classpath.
 
 Three tests carry the rule itself. `ControlPlaneSecurityAutoConfigurationTest` drives real requests
 through the real chain - no token is a 401, a token without the role a 403, a client role a 403.
@@ -340,8 +339,12 @@ directly. A script that took the shortcut would be the one thing a reader copies
 ## Open decisions
 
 - **Transactional consistency of provisioning.** A Keycloak call can succeed while the event append
-  fails, or the reverse - there is no shared transaction. If retries prove necessary, the `process` side's
-  outbox is the place for them.
+  fails, or the reverse - there is no shared transaction. If retries prove necessary they belong in an
+  outbox, and jtenman has no process side to hold one - see below.
 - **When a suspended tenant should be deleted.** `deleteTenant` exists and is the erasure path, but
-  nothing drives it: an operator decides. If a retention period ("delete N months after suspension")
-  is ever required, that is a job for the `process` side, not for a human to remember.
+  nothing drives it: an operator decides. A retention period ("delete N months after suspension") would
+  need something scheduled, which is the second thing that would justify a process side.
+- **jtenman has no process side at all.** Its provisioning is synchronous - every Keycloak change happens
+  inside the command that asked for it - so there is nothing to coordinate and no outbox to deliver. The
+  modules were removed rather than left empty. The two decisions above are what would bring them back;
+  until then jtenman needs no `svc-command-dispatch` service account, because it dispatches nothing.

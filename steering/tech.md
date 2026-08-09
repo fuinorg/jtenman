@@ -10,7 +10,7 @@ CQRS concern, each split into `api`, `core`, `server` and `starter`:
 jtenman                 (pom, root parent)
 ├── steering            (non-Maven)          # Product, technology and security documentation
 ├── model               (jar)                # CQRS model files and SrcGen4J generator - NOT published
-├── shared              (jar)                # code shared across the command, query and process sides
+├── shared              (jar)                # code shared across the command and query sides
 ├── internal            (jar)                # Spring Boot auto-configuration shared by jtenman's own starters
 ├── query               (pom, aggregator)    # read side
 │   ├── api             (jar)                # public query contracts - published
@@ -22,8 +22,6 @@ jtenman                 (pom, root parent)
 │   ├── core            (jar)                # the Tenant aggregate
 │   ├── server          (jar)
 │   └── starter         (jar)
-├── process             (pom, aggregator)    # process managers
-│   ├── api / core / server / starter
 ├── starter             (jar)                # what a CONSUMER adds - published
 └── combined            (jar)                # all three sides in one deployable
 ```
@@ -57,7 +55,7 @@ The DSL is private: nothing outside jtenman imports the model, so `model` is **n
   server being administered, not to its exact version - see [security.md](security.md)
 - **Build:** Maven
 - **Ports:** `909x`, so jtenman runs beside the applications it administers (`808x`) - `combined` 9090,
-  `command/server` 9091, `query/server` 9092, `process/server` 9093
+  `command/server` 9091, `query/server` 9092
 
 ## Multi-tenancy: jtenman has none
 
@@ -71,7 +69,7 @@ realm of the Keycloak instance - the exact hole jtenman exists to close. See [se
 - **Unit Tests:** JUnit 5 + Mockito
 - **Integration Tests:** classes named `*IT` run in `verify` via failsafe, so `mvn test` needs no
   container runtime. Containers come from `TestHelper` in `org.fuin.cqrs4j:cqrs-4-java-test-helper`.
-  Each of the four deployables has one that boots the real Spring context against a real KurrentDB and
+  Each deployable has one that boots the real Spring context against a real KurrentDB and
   asserts the Actuator health endpoint reports `UP`. Only the event store is a container: the read model
   is in-memory H2, and each IT replaces the Keycloak-backed security chain with a permit-all one, so no
   identity provider is needed to reach `/actuator/health`.

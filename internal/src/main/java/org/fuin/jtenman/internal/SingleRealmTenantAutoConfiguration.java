@@ -21,9 +21,9 @@ import org.springframework.context.annotation.Bean;
  * accept a token from any realm of its Keycloak instance, including the realms it creates for tenants:
  * the control plane would inherit the exact hole it exists to close.
  * <p>
- * This is deliberately an auto-configuration rather than something each deployable imports. All four
- * deployables (combined, command/server, query/server, process/server) reach it through their jtenman
- * starter, and a fifth one added later gets it without anyone remembering to - the failure mode of a
+ * This is deliberately an auto-configuration rather than something each deployable imports. Every
+ * deployable (combined, command/server, query/server) reaches it through its jtenman starter, and one
+ * added later gets it without anyone remembering to - the failure mode of a
  * forgotten import is a silently discovering repository, which is the one failure this class exists to
  * prevent.
  * <p>
