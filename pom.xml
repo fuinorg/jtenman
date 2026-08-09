@@ -25,6 +25,7 @@
         <objects4j.version>0.12.0-SNAPSHOT</objects4j.version>
         <ddd4j.version>0.8.0-SNAPSHOT</ddd4j.version>
         <cqrs4j.version>0.7.0-SNAPSHOT</cqrs4j.version>
+        <cqrs4j-springboot.version>0.7.0-SNAPSHOT</cqrs4j-springboot.version>
         <esc.version>0.10.0-SNAPSHOT</esc.version>
         <jandex.version>3.2.7</jandex.version>
         <testcontainers.version>1.21.4</testcontainers.version>
@@ -102,6 +103,20 @@
                 <groupId>org.fuin.cqrs4j</groupId>
                 <artifactId>cqrs-4-java-bom</artifactId>
                 <version>${cqrs4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!--
+                The Spring Boot flavour moved to its own repository (fuinorg/cqrs-4-springboot) and
+                publishes its own BOM. No artifactId changed - only the version of the springboot
+                artifacts now comes from here rather than from cqrs-4-java-bom, and the two can be
+                released independently.
+            -->
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-bom</artifactId>
+                <version>${cqrs4j-springboot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
