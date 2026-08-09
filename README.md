@@ -90,12 +90,13 @@ Every module has a `README.md` of its own; this is the map.
 | `command`  | Write side: the `Tenant` aggregate and its commands.                                  |
 | `query`    | Read side: the tenant projection and the contract applications poll.                  |
 | `starter`  | **The one module an administered application adds.**                                  |
+| `test-helper` | `StubJtenman`, so a consumer can test against jtenman without running one.          |
 | `combined` | Both sides in one deployable - the normal way to run jtenman.                         |
 | `e2e`      | End-to-end test of an administered application against a running jtenman.             |
 
 Published: `jtenman-starter`, the one you add; `jtenman-shared` and `jtenman-query-api`, which it brings
-with it; and `jtenman-command-api`, for a client that sends jtenman its commands rather than consuming
-its tenants.
+with it; `jtenman-test-helper`, for testing against it; and `jtenman-command-api`, for a client that
+sends jtenman its commands rather than consuming its tenants.
 
 ## Building
 

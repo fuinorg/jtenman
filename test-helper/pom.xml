@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.fuin</groupId>
+        <artifactId>jtenman</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>jtenman-test-helper</artifactId>
+
+    <name>jtenman-test-helper</name>
+    <description>Test doubles an administered application needs to test its use of jtenman-starter</description>
+
+    <dependencies>
+
+        <!-- compile -->
+
+        <dependency>
+            <groupId>org.fuin</groupId>
+            <artifactId>jtenman-shared</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.dsl.cqrs.contexts</groupId>
+            <artifactId>cqrs-common-java</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.ddd4j</groupId>
+            <artifactId>ddd-4-java-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.ddd4j</groupId>
+            <artifactId>ddd-4-java-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.objects4j</groupId>
+            <artifactId>objects4j-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.fuin.objects4j</groupId>
+            <artifactId>objects4j-jackson</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- test -->
+
+        <!--
+            Only here, on purpose. The stub serves a literal path, and this module must not force
+            spring-web onto a consumer that does not have it - jtenman's REST contract is generated in a
+            Quarkus flavour too. The test reads the annotations off the generated contract and fails if
+            the literal ever stops matching them, which is the drift this would otherwise invite.
+        -->
+        <dependency>
+            <groupId>org.fuin</groupId>
+            <artifactId>jtenman-query-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.glassfish.expressly</groupId>
+            <artifactId>expressly</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+</project>

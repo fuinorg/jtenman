@@ -162,6 +162,12 @@
                 <version>${project.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>jtenman-test-helper</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- compile -->
 
             <dependency>
@@ -263,6 +269,7 @@
         <module>query</module>
         <module>command</module>
         <module>starter</module>
+        <module>test-helper</module>
         <module>combined</module>
         <module>e2e</module>
     </modules>
