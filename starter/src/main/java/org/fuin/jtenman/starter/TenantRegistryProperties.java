@@ -1,6 +1,7 @@
 package org.fuin.jtenman.starter;
 
 import org.fuin.objects4j.common.Immutable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -40,6 +41,9 @@ public class TenantRegistryProperties {
 
     private final Duration readTimeout;
 
+    @Nullable
+    private final String clientRegistrationId;
+
     /**
      * Constructor with all data.
      *
@@ -57,16 +61,21 @@ public class TenantRegistryProperties {
      *                     known list indefinitely.
      * @param connectTimeout Connect timeout of the pull.
      * @param readTimeout Read timeout of the pull.
+     * @param clientRegistrationId Id of the {@code spring.security.oauth2.client.registration} entry
+     *                             describing the service account the list is fetched as. Absent means
+     *                             the pull sends no token at all, which jtenman answers with a 401.
      */
     public TenantRegistryProperties(final String url, final String application,
             final Duration refreshInterval, final Duration maxStaleness,
-            final Duration connectTimeout, final Duration readTimeout) {
+            final Duration connectTimeout, final Duration readTimeout,
+            @Nullable final String clientRegistrationId) {
         this.url = url;
         this.application = application;
         this.refreshInterval = refreshInterval == null ? DEFAULT_REFRESH_INTERVAL : refreshInterval;
         this.maxStaleness = maxStaleness == null ? DEFAULT_MAX_STALENESS : maxStaleness;
         this.connectTimeout = connectTimeout == null ? DEFAULT_TIMEOUT : connectTimeout;
         this.readTimeout = readTimeout == null ? DEFAULT_TIMEOUT : readTimeout;
+        this.clientRegistrationId = clientRegistrationId;
     }
 
     /**
@@ -103,6 +112,16 @@ public class TenantRegistryProperties {
      */
     public Duration getMaxStaleness() {
         return maxStaleness;
+    }
+
+    /**
+     * Returns the client registration describing the service account the tenant list is fetched as.
+     *
+     * @return Registration id, or {@literal null} if the pull is unauthenticated.
+     */
+    @Nullable
+    public String getClientRegistrationId() {
+        return clientRegistrationId;
     }
 
     /**

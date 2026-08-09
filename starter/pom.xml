@@ -99,6 +99,18 @@
             <artifactId>spring-web</artifactId>
         </dependency>
 
+        <!-- optional -->
+
+        <!-- Spring Security's OAuth2 client, used to obtain and cache the service account token the
+             tenant list is fetched with. Optional: an application that authenticates the pull some other
+             way, or not at all, should not have to carry it. TenantListClientCredentialsAutoConfiguration
+             is conditional on it being present. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- provided -->
 
         <!-- Referenced only by the 'before' attribute of TenantRegistryAutoConfiguration. The consuming

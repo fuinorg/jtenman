@@ -39,10 +39,20 @@ jtenman:
     application: billing
 ```
 
-**3. Supply the token the tenant list is fetched with.** jtenman requires a role on that endpoint, so
-declare a `TenantListAuthProvider` bean returning a client-credentials token of the `svc-tenant-read`
-service account. Without one the pull is unauthenticated, jtenman answers 401, and your application
-accepts nobody.
+**3. Point it at your service account.** jtenman requires a role on the tenant list, so the pull needs a
+token. Name a `spring.security.oauth2.client.registration` entry and the starter fetches one as your
+`svc-tenant-read` account:
+
+```yaml
+jtenman:
+  registry:
+    client-registration-id: jtenman
+```
+
+An operator creates that account - a confidential Keycloak client in the administration realm, with an
+audience mapper and the `svc-tenant-read` role granted through a group. jtenman cannot create it: it
+provisions Keycloak with the caller's own token and holds no credential of its own.
+`doc/example/setup-keycloak.sh` does it for local development and prints the configuration to copy.
 
 **4. Get registered.** An administrator adds your application to jtenman's catalogue and subscribes each
 tenant to it with `subscribeApplication`, which also creates your Keycloak client and its audience
@@ -80,7 +90,8 @@ Every module has a `README.md` of its own; this is the map.
 | `command`  | Write side: the `Tenant` aggregate and its commands.                                  |
 | `query`    | Read side: the tenant projection and the contract applications poll.                  |
 | `starter`  | **The one module an administered application adds.**                                  |
-| `combined` | All three sides in one deployable - the normal way to run jtenman.                    |
+| `combined` | Both sides in one deployable - the normal way to run jtenman.                         |
+| `e2e`      | End-to-end test of an administered application against a running jtenman.             |
 
 Published: `jtenman-starter`, the one you add; `jtenman-shared` and `jtenman-query-api`, which it brings
 with it; and `jtenman-command-api`, for a client that sends jtenman its commands rather than consuming

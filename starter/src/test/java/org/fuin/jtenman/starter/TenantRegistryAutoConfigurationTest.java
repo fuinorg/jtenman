@@ -13,6 +13,12 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -137,6 +143,31 @@ class TenantRegistryAutoConfigurationTest {
     }
 
     /**
+     * Naming a client registration switches the pull from unauthenticated to the service account. The
+     * no-op provider has to back off completely - two providers would leave which token is sent to bean
+     * ordering.
+     */
+    @Test
+    void testAClientRegistrationReplacesTheNoOpProvider() {
+
+        runner().run(context ->
+                assertThat(context).hasSingleBean(TenantListAuthProvider.class)
+                        .getBean(TenantListAuthProvider.class)
+                        .isInstanceOf(NoOpTenantListAuthProvider.class));
+
+        runner().withUserConfiguration(ServiceAccountConfiguration.class)
+                .withPropertyValues("jtenman.registry.client-registration-id=jtenman")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(TenantListAuthProvider.class);
+                    assertThat(context).doesNotHaveBean(NoOpTenantListAuthProvider.class);
+                    assertThat(context.getBean(TenantListAuthProvider.class))
+                            .isInstanceOf(ClientCredentialsTenantListAuthProvider.class);
+                });
+
+    }
+
+    /**
      * An application that cannot reach jtenman while it starts still has to come up - refusing would tie
      * every rollout to the control plane being up at that moment - but it accepts nobody until a later
      * pull succeeds.
@@ -159,6 +190,7 @@ class TenantRegistryAutoConfigurationTest {
     private ApplicationContextRunner runner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(
+                        TenantListClientCredentialsAutoConfiguration.class,
                         TenantRegistryAutoConfiguration.class,
                         KeycloakSecurityAutoConfiguration.class))
                 .withPropertyValues(
@@ -210,6 +242,32 @@ class TenantRegistryAutoConfigurationTest {
         @Bean
         TenantListAuthProvider tenantListAuthProvider() {
             return () -> Optional.of("svc-tenant-read-token");
+        }
+
+    }
+
+    /**
+     * Stands in for Spring Boot's OAuth2 client auto-configuration, which builds these two from
+     * {@code spring.security.oauth2.client.registration}. Nothing here asks the token endpoint for
+     * anything - what is under test is which provider the context ends up with.
+     */
+    @Configuration(proxyBeanMethods = false)
+    static class ServiceAccountConfiguration {
+
+        @Bean
+        ClientRegistrationRepository clientRegistrationRepository() {
+            return new InMemoryClientRegistrationRepository(ClientRegistration
+                    .withRegistrationId("jtenman")
+                    .clientId("billing-svc")
+                    .clientSecret("secret")
+                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                    .tokenUri("http://localhost:8180/realms/master/protocol/openid-connect/token")
+                    .build());
+        }
+
+        @Bean
+        OAuth2AuthorizedClientService authorizedClientService(final ClientRegistrationRepository repository) {
+            return new InMemoryOAuth2AuthorizedClientService(repository);
         }
 
     }

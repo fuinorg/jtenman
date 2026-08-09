@@ -23,7 +23,8 @@ jtenman                 (pom, root parent)
 │   ├── server          (jar)
 │   └── starter         (jar)
 ├── starter             (jar)                # what a CONSUMER adds - published
-└── combined            (jar)                # all three sides in one deployable
+├── combined            (jar)                # both sides in one deployable
+└── e2e                 (jar)                # end-to-end test of the two together - NOT published
 ```
 
 `command/api` and `query/api` are generated-only; their `src/main/java` exists with a `.gitkeep` so

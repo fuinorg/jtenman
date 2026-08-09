@@ -167,6 +167,15 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- The executable jar gets a classifier so the plain one stays the main artifact.
+                         Without this, "repackage" replaces it and nothing can depend on this module -
+                         the classes end up under BOOT-INF/classes, where a class path cannot see them.
+                         The e2e module boots this exact deployable, and testing the real thing is worth
+                         more than the shorter file name. Run it with "mvn spring-boot:run", or with
+                         "java -jar target/jtenman-combined-exec.jar". -->
+                    <classifier>exec</classifier>
+                </configuration>
             </plugin>
 
             <plugin>

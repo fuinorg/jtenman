@@ -14,7 +14,7 @@ to be undone before the tenant can be deleted. That is the `MustBeSuspended` rul
 
 ```bash
 podman compose up -d                       # KurrentDB, PostgreSQL, Keycloak    (repository root)
-./doc/example/setup-keycloak.sh            # once: the client, the role and the group
+./doc/example/setup-keycloak.sh            # once: the clients, the roles and the groups
 mvn -pl :jtenman-combined spring-boot:run  # jtenman on 9090                    (repository root)
 
 ./doc/example/run-example.sh
@@ -31,6 +31,8 @@ Needs `curl` and `jq`. Everything is overridable by environment variable:
 | `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` | `admin` / `admin`       | the dev bootstrap account                  |
 | `JTENMAN_URL`                         | `http://localhost:9090` | the `combined` deployable                  |
 | `ROLE` / `GROUP`                      | `tenant-admin` / `tenant-admins` | `setup-keycloak.sh` only - see below |
+| `APPLICATION`                         | `melkheftken`           | whose service account is provisioned       |
+| `SVC_ROLE` / `SVC_GROUP`              | `svc-tenant-read` / `svc-tenant-readers` | `setup-keycloak.sh` only  |
 
 ## Step by step, if you would rather do it by hand
 
@@ -42,6 +44,12 @@ it does not exist yet; using `admin-cli` here answers
 The same script also puts `admin` in the `tenant-admins` group, which carries the **`tenant-admin` realm
 role**. Every `/cmd/**` call needs it and so does the read side, so a token without it is a `403` - see
 below.
+
+It provisions a second account while it is there: `melkheftken-svc`, a confidential client whose service
+account holds **`svc-tenant-read`** and nothing else. That is what an administered application polls the
+tenant list with, and the script prints the configuration to paste into it. It may read `/view/**` and is
+refused everywhere else - posting a command with its token answers `403`, which is the least privilege
+being least.
 
 ```bash
 TOKEN=$(curl -s -X POST \

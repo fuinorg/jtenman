@@ -184,6 +184,37 @@ names and issuer URIs are public and OIDC discovery documents world-readable. Th
 is *integrity*, a spoofed list injecting a rogue tenant, which is also why **TLS is mandatory** for it
 regardless of the token.
 
+### `svc-tenant-read`, and who creates it
+
+This is the account an administered application polls its tenant list with. **jtenman never holds it** -
+it only checks the role on `/view/**`. The credential belongs to the application, which obtains a token
+with it through `ClientCredentialsTenantListAuthProvider` in `jtenman-starter`.
+
+Four things have to be true of the Keycloak client, and each fails differently:
+
+| | Missing |
+|---|---|
+| Confidential, `serviceAccountsEnabled` | no token at all |
+| Audience mapper emitting `jtenman-api` | 401 - the token is valid but not for jtenman |
+| `svc-tenant-read` **realm** role, through a group | 403 - granted on the client instead, it is invisible |
+| In the **administration** realm | 401 - jtenman accepts that realm and no other |
+
+The last one is the one that surprises: `subscribeApplication` creates an application's client inside the
+*tenant's* realm, so its tokens carry the application's audience for that tenant. This client is a
+different animal - it is the application's own identity against the control plane, one per application
+rather than one per tenant, and it lives where jtenman's API lives.
+
+**An operator creates it, not jtenman.** That is a decision, and the reasons are structural rather than
+incidental: jtenman performs every Keycloak change with the caller's own token and holds no credential of
+its own, so it cannot provision anything at start-up; `KeycloakTenantAdapter.createClient` deliberately
+creates *public* clients per tenant realm; and the application catalogue this client belongs to is static
+configuration, not domain state - making jtenman own the client would mean making the catalogue an
+aggregate. `doc/example/setup-keycloak.sh` performs the whole provisioning for local development and
+prints the configuration to copy, so the operator task is written down as a script rather than as prose.
+
+**`svc-command-dispatch` has no use in jtenman.** It authenticates outbox delivery, and jtenman has no
+process side and no outbox - see "Open decisions". The rule above stands for applications that do.
+
 ## Realm names are constrained, and jtenman enforces it
 
 `org.fuin.ddd4j.core.TenantId` accepts **2-10 characters** matching `^[a-z][a-z|0-9|_]*[a-z|0-9]$` -
@@ -245,10 +276,14 @@ Four properties of it are security decisions rather than implementation detail:
   repository cannot do this - it learns of an issuer only when a token carrying it arrives - and pays for
   it with a negative cache to stop a slow Keycloak occupying every request thread.
 
-The pull itself needs the `svc-tenant-read` role, so the application declares a `TenantListAuthProvider`.
-It is a seam rather than a property because the token is short lived and has to be obtained: a static
-token in a configuration file is the long-lived credential the rules below exist to avoid. The default
-provider sends nothing, jtenman answers 401 and the list stays empty - loud and closed.
+The pull itself needs the `svc-tenant-read` role, which the application supplies through a
+`TenantListAuthProvider`. Naming a `spring.security.oauth2.client.registration` entry in
+`jtenman.registry.client-registration-id` is enough: the starter then obtains and caches a
+client-credentials token of that service account. A seam rather than a plain property because the token
+is short lived and has to be obtained - a static token in a configuration file is exactly the long-lived
+credential the rules above exist to avoid, and the client secret sits in the registration where the
+application already injects secrets from. With no provider at all the pull sends nothing, jtenman answers
+401 and the list stays empty - loud and closed. See "svc-tenant-read, and who creates it" above.
 
 **An unreachable jtenman does not stop an application from starting.** Refusing would tie every
 administered application's rollout to the control plane being up at that moment, and the application is
@@ -334,7 +369,14 @@ anywhere else.
 `doc/example/setup-keycloak.sh` grants that bootstrap account `tenant-admin` - and does it the way the
 rules above require even though it is a development script: it creates the realm role, creates a
 `tenant-admins` group carrying it, and puts the user in the group rather than granting the role
-directly. A script that took the shortcut would be the one thing a reader copies.
+directly. A script that took the shortcut would be the one thing a reader copies. The same holds for the
+`svc-tenant-read` account it provisions: own role, own group, service account placed in the group.
+
+It **prints the generated client secret**, which nothing that ships may ever do. It is defensible only
+because that secret belongs to the `start-dev` Keycloak above, a developer has no other way to get it,
+and the script says so in red on the line below it. The configuration it prints uses a
+`${JTENMAN_SVC_TENANT_READ_SECRET}` placeholder rather than the value, so what a reader copies is the
+right shape.
 
 ## Open decisions
 

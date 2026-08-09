@@ -188,6 +188,19 @@
                 <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-admin-client</artifactId>
                 <version>${keycloak.version}</version>
+                <exclusions>
+                    <!-- It drags in the legacy "org.jboss:jandex" 2.4.5, which carries the SAME
+                         "org.jboss.jandex" package as the "io.smallrye:jandex" 3.x this project indexes
+                         and reads with. Two jars, one package: whichever comes first on the class path
+                         wins, and the old reader cannot read a version 12 index - it fails with
+                         "Can't read index version 12" while building the object mapper, which reads as a
+                         Jackson problem. Excluding it leaves exactly one jandex everywhere instead of
+                         relying on the order Maven happens to produce. -->
+                    <exclusion>
+                        <groupId>org.jboss</groupId>
+                        <artifactId>jandex</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- Not part of the cqrs-4-java BOM, so pin it to the same version as the rest. -->
@@ -251,6 +264,7 @@
         <module>command</module>
         <module>starter</module>
         <module>combined</module>
+        <module>e2e</module>
     </modules>
 
     <build>

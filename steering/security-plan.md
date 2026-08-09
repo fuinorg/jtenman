@@ -11,59 +11,37 @@ Status as of 2026-08-09.
 
 Checkable from source rather than from another document:
 
-|                         | State                                                                                                                                                                                     |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Trust boundary          | **Done.** `SingleRealmTenantAutoConfiguration` pins jtenman to the administration realm; `SingleRealmTenantAutoConfigurationTest` proves the discovering repository backs off.             |
-| `tenant-admin` role     | **Done.** `ControlPlaneSecurityAutoConfiguration` is the only filter chain a deployable has, and `ArchitectureTest` keeps a permit-all chain out of production sources.                    |
-| Consumer-facing starter | **Done.** `jtenman-starter` replicates the tenant list into a `JwtTenantRepository`, announces what changed, and fails closed before the first pull and after `max-staleness`.             |
-| Service accounts        | **Not started.** No client-credentials registration, no `svc-tenant-read`, no `svc-command-dispatch`, and `KeycloakTenantAdapter.createClient` cannot yet create the confidential client.  |
+|                         | State                                                                                                                                                                          |
+|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Trust boundary          | **Done.** `SingleRealmTenantAutoConfiguration` pins jtenman to the administration realm.                                                                                       |
+| `tenant-admin` role     | **Done.** `ControlPlaneSecurityAutoConfiguration` is the only filter chain a deployable has, and `ArchitectureTest` keeps a permit-all chain out of production sources.         |
+| Consumer-facing starter | **Done.** `jtenman-starter` replicates the tenant list into a `JwtTenantRepository` and fails closed before the first pull and after `max-staleness`.                           |
+| `svc-tenant-read`       | **Done.** `ClientCredentialsTenantListAuthProvider` fetches the list as the service account; `setup-keycloak.sh` provisions role, group, confidential client and audience mapper. |
+| `svc-command-dispatch`  | **Not applicable.** It authenticates outbox delivery and jtenman has no process side. The rule stands in `security.md` for applications that do.                               |
 
-One quick check:
-
-```bash
-grep -rn "svc-tenant-read\|client_credentials" --include="*.java" .   # only the role constant
-```
-
-## 1. Service accounts
-
-`security.md` § "Machine-to-machine access uses dedicated roles" states the rule; nothing implements it.
-Two accounts, each in its own group, no `realm-management`, secrets from a secret store rather than from
-`application.yml`:
-
-| Account                | For                                                |
-|------------------------|----------------------------------------------------|
-| `svc-tenant-read`      | the registry pull an administered application does |
-| `svc-command-dispatch` | outbox delivery of a command                       |
-
-Both halves of `svc-tenant-read` are waiting for it and neither needs new code: the filter chain already
-admits the role (see `JtenmanRoles`), and `jtenman-starter` already has the seam that supplies the token
-— a `TenantListAuthProvider` bean. Provisioning the account and writing that provider is the whole step.
-Until it exists the pull is unauthenticated, answers 401, and every administered application accepts
-nobody. **That is the one thing between the consumer-facing starter and a deployment that works.**
-
-**jtenman cannot provision the client it needs, and that is the part to decide before deployment
-day.** `KeycloakTenantAdapter.createClient` creates an application's client as a *public* one
-(`setPublicClient(true)`, `setDirectAccessGrantsEnabled(false)`, standard flow only). A service account
-needs a confidential client with `serviceAccountsEnabled=true`, and for `private_key_jwt` also
-`clientAuthenticatorType = "client-jwt"` plus the public key — as a JWKS URL if the application can serve
-one, otherwise a configured certificate. Either `KeycloakTenantAdapter` gains a second client — which
-also means extending `ApplicationCatalogue.Entry`, today just `id`/`displayName`/`clientId`/`audience` —
-or the operator creates it outside the jtenman flow. Decide which; do not discover it at deployment time.
-
-Prefer `private_key_jwt` over a client secret where the counterparty supports it: it removes the shared
-secret, so there is nothing both sides know and nothing replayable from a captured request. A private key
-still has to be placed until signing moves into a secret store, which is a smaller problem, not none.
+**No security step is outstanding.** What follows is the tail: things worth doing, none of them blocking
+a deployment.
 
 ## Carry-overs
 
-- Adopt `AuditedRepository` in the seven command handlers — the same audit trail for free.
-- **The `*ApplicationIT` classes still run permit-all.** They declare their own
-  `SecurityFilterChain` so they can reach `/actuator/health` without a Keycloak. That is the documented
-  escape hatch and `ArchitectureTest` fences it, but it does mean they prove only that the context
-  starts — `ControlPlaneAuthorizationIT` is the one that proves anything about who may call what. Worth
-  revisiting if another deployable ever copies the pattern without adding an authorization IT beside it.
-- **The tenant list has no end-to-end test against a running jtenman.** `TenantRegistryAutoConfigurationTest`
-  drives the real pull over real HTTP, but against a stand-in serving a captured response. The capture was
-  verified by hand against a live `combined` — including that an unsubscribed tenant stops being accepted
-  within one refresh interval — and that check is worth turning into an IT once there is a service account
-  to authenticate it with.
+- **Adopt `AuditedRepository` in the seven command handlers** — the same audit trail for free. The only
+  item here with a security payoff, and the reason it is first.
+- **The `*ApplicationIT` classes still run permit-all.** They declare their own `SecurityFilterChain` so
+  they can reach `/actuator/health` without a Keycloak. That is the documented escape hatch and
+  `ArchitectureTest` fences it, but it does mean they prove only that the context starts —
+  `ControlPlaneAuthorizationIT` is the one that proves anything about who may call what. Worth revisiting
+  if another deployable ever copies the pattern without adding an authorization IT beside it.
+- ~~The consumer side has no automated end-to-end test.~~ **Done.** `TenantRegistryE2EIT` in the `e2e`
+  module runs the whole chain against a real Keycloak and a real jtenman: service account, audience
+  mapper, role through a group, replication, revocation within one refresh interval, and the account
+  being refused on `/cmd`.
+- **`private_key_jwt` instead of a client secret.** `svc-tenant-read` uses a shared secret today. Spring
+  reaches the asymmetric variant with `client-authentication-method: private_key_jwt` and a parameters
+  converter, needing no change in `jtenman-starter`; the remaining problem is placing the key, which is a
+  secret-store question rather than a jtenman one.
+
+## Still open, and not scheduled here
+
+Both are in `security.md` under "Open decisions" and would bring back the process side that was removed:
+retries for provisioning that half-succeeded, and a retention period after which a suspended tenant is
+deleted.
