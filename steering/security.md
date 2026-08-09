@@ -55,7 +55,55 @@ discovering - later the jtenman-fed - repository; pinning it to one realm would 
 of its own tenants. That is why the keycloak starter is a `provided` dependency there rather than a
 compile one, so it cannot travel to a consumer through `jtenman-query-starter`.
 
-Access is restricted to a `tenant-admin` realm role.
+## Access is restricted to a `tenant-admin` realm role
+
+`ControlPlaneSecurityAutoConfiguration` in `starter-common` is the only `SecurityFilterChain` a jtenman
+deployable has:
+
+| Path            | Requires                            | In practice                          |
+|-----------------|-------------------------------------|--------------------------------------|
+| `/cmd/**`       | `tenant-admin`                      | every command                        |
+| `/view/**`      | `tenant-admin` or `svc-tenant-read` | the tenant list an application polls |
+| everything else | an authenticated caller, no role    | the actuator, the OpenAPI UI         |
+
+Without it a deployable falls back to Spring Boot's default resource-server chain, which asks no more
+than `anyRequest().authenticated()`. In the control plane that is close to no authorization at all: any
+person with an account in the administration realm and a token carrying the `jtenman-api` audience could
+create realms, invite administrators and delete tenants. The single-realm repository above answers *which
+realm* may speak to jtenman; this answers *who inside it* may do what. Both are needed.
+
+Three things about it are easy to get wrong and are therefore fixed here:
+
+- **Only realm roles work.** `KeycloakJwtAuthenticationConverter` maps `realm_access.roles` and ignores
+  `resource_access.*.roles`, so `tenant-admin` granted as a client role is invisible - a 403 against a
+  Keycloak setup that looks correct. This is the same rule as for the service accounts below, seen from
+  the other side.
+- **The command paths are matched for every HTTP method**, not for `POST` only. A method-scoped matcher
+  would let any other verb on the same path fall through to the merely-authenticated rule beneath it.
+- **CSRF is off and no session is created.** Every caller authenticates with a bearer token per request,
+  so there is no cookie to ride on. The defaults would reject every `POST /cmd/{type}` for a missing CSRF
+  token, which is not a security property here but an outage.
+
+`svc-tenant-read` is admitted to the read side although the service account carrying it does not exist
+yet - the tenant list is what an administered application polls, and that pull is a machine identity (see
+below). Until it is provisioned the read side is reachable with a `tenant-admin` token, which is what
+`doc/example/run-example.sh` uses.
+
+The chain is `@ConditionalOnMissingBean(SecurityFilterChain.class)`, so an application-supplied chain
+replaces it whole. That is what the four `*ApplicationIT` classes use to boot without a Keycloak, and it
+is the one way this rule can be lost: a permit-all chain left outside test scope would silently take over
+- the application still starts, still validates tokens, still looks configured, and no longer checks a
+role. **`ArchitectureTest`, in each of the four deployables, refuses to let that reach production
+sources.** It matches a class that calls both `anyRequest()` and `permitAll()` - neither half alone,
+because the production chain calls `anyRequest()` too and a legitimate chain may permit a single path -
+and it has no exception: jtenman ships no development profile, so there is nowhere such a chain belongs
+outside a test. Four copies rather than one, because each deployable scans its own classpath.
+
+Three tests carry the rule itself. `ControlPlaneSecurityAutoConfigurationTest` drives real requests
+through the real chain - no token is a 401, a token without the role a 403, a client role a 403.
+`ControlPlaneAuthorizationIT` repeats it over HTTP against the deployable's own controllers, which
+matters because `TenantController` is regenerated on every build and its mapping is not something review
+can rely on staying put. `ArchitectureTest` guards the escape hatch above.
 
 ## Provisioning runs as the signed-in administrator
 
@@ -238,6 +286,11 @@ same realm answers "A tenant is already registered".
 `docker-compose.yml` runs Keycloak in `start-dev` with a literal `admin/admin` bootstrap account and no
 TLS. Development only, and labelled as such. Nothing in this repository may ship a credential that works
 anywhere else.
+
+`doc/example/setup-keycloak.sh` grants that bootstrap account `tenant-admin` - and does it the way the
+rules above require even though it is a development script: it creates the realm role, creates a
+`tenant-admins` group carrying it, and puts the user in the group rather than granting the role
+directly. A script that took the shortcut would be the one thing a reader copies.
 
 ## Open decisions
 

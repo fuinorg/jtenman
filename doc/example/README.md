@@ -14,7 +14,7 @@ to be undone before the tenant can be deleted. That is the `MustBeSuspended` rul
 
 ```bash
 podman compose up -d                       # KurrentDB, PostgreSQL, Keycloak    (repository root)
-./doc/example/setup-keycloak.sh            # once: the client whose tokens jtenman accepts
+./doc/example/setup-keycloak.sh            # once: the client, the role and the group
 mvn -pl :jtenman-combined spring-boot:run  # jtenman on 9090                    (repository root)
 
 ./doc/example/run-example.sh
@@ -30,6 +30,7 @@ Needs `curl` and `jq`. Everything is overridable by environment variable:
 | `REALM`                               | a fresh random one      | the realm the run creates                  |
 | `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` | `admin` / `admin`       | the dev bootstrap account                  |
 | `JTENMAN_URL`                         | `http://localhost:9090` | the `combined` deployable                  |
+| `ROLE` / `GROUP`                      | `tenant-admin` / `tenant-admins` | `setup-keycloak.sh` only - see below |
 
 ## Step by step, if you would rather do it by hand
 
@@ -37,6 +38,10 @@ Needs `curl` and `jq`. Everything is overridable by environment variable:
 the `aud` claim, and only this client emits the `jtenman-api` audience. Run `./setup-keycloak.sh` first if
 it does not exist yet; using `admin-cli` here answers
 `401 ... The aud claim is not valid`.
+
+The same script also puts `admin` in the `tenant-admins` group, which carries the **`tenant-admin` realm
+role**. Every `/cmd/**` call needs it and so does the read side, so a token without it is a `403` - see
+below.
 
 ```bash
 TOKEN=$(curl -s -X POST \
@@ -110,7 +115,7 @@ with PKCE. This script is the exception and stays one: a shell script has no bro
 talks only to the local development Keycloak from `docker-compose.yml`, and the token never leaves the
 machine. Do not copy this into anything that ships.
 
-## Three things the run will teach you
+## Four things the run will teach you
 
 **A fresh token per command, not one for the whole run.** Keycloak grants the roles that administer a
 realm *per realm*, so a token minted before `registerTenant` created the realm carries no rights over it -
@@ -121,6 +126,12 @@ re-authenticate in between.
 it, and Keycloak's built-in `admin-cli` does not emit the `jtenman-api` audience. That is what
 `setup-keycloak.sh` creates: a `jtenman-cli` client with an audience mapper. Without it every call is a
 401, which is the audience check doing its job.
+
+**401 and 403 answer different questions.** A 401 means the token was not accepted at all - wrong
+audience, wrong realm, expired, or none sent. A 403 means it was accepted and the caller is simply not a
+`tenant-admin`. The role has to be a **realm** role: the Keycloak starter maps `realm_access.roles` and
+ignores client roles, so granting `tenant-admin` on the `jtenman-cli` client instead leaves every call a
+403 against a Keycloak setup that looks right in the UI.
 
 **A realm name is retired once its tenant is deleted.** `deleteTenant` removes the realm in Keycloak, but
 the aggregate and its event stream stay - marked deleted, answering every further command with
