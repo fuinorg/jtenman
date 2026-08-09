@@ -19,13 +19,12 @@ Checkable from source rather than from another document:
 | `svc-tenant-read`       | **Done.** `ClientCredentialsTenantListAuthProvider` fetches the list as the service account; `setup-keycloak.sh` provisions role, group, confidential client and audience mapper. |
 | `svc-command-dispatch`  | **Not applicable.** It authenticates outbox delivery and jtenman has no process side. The rule stands in `security.md` for applications that do.                               |
 
-**No security step is outstanding.** What follows is the tail: things worth doing, none of them blocking
-a deployment.
+**No security step is outstanding**, and the audit trail is in place: every event names the caller who
+caused it (`security.md`, "Who did it is recorded"). What follows is the tail — things worth doing, none
+of them blocking a deployment.
 
 ## Carry-overs
 
-- **Adopt `AuditedRepository` in the seven command handlers** — the same audit trail for free. The only
-  item here with a security payoff, and the reason it is first.
 - **The `*ApplicationIT` classes still run permit-all.** They declare their own `SecurityFilterChain` so
   they can reach `/actuator/health` without a Keycloak. That is the documented escape hatch and
   `ArchitectureTest` fences it, but it does mean they prove only that the context starts —

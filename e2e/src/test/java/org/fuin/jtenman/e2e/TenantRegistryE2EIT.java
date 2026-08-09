@@ -1,5 +1,8 @@
 package org.fuin.jtenman.e2e;
 
+import io.kurrent.dbclient.KurrentDBClient;
+import io.kurrent.dbclient.ReadStreamOptions;
+import io.kurrent.dbclient.ResolvedEvent;
 import org.fuin.cqrs4j.test.helper.TestHelper;
 import org.fuin.ddd4j.core.TenantId;
 import org.fuin.ddd4j.core.TenantRemovedEvent;
@@ -15,6 +18,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +34,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -54,6 +59,8 @@ import static org.awaitility.Awaitility.await;
  *     within one refresh interval, and the removal is announced so the cached issuer validator and key
  *     selector drop it.</li>
  * <li>The service account may read the list and nothing else.</li>
+ * <li>The provisioning audit trail names the administrator who actually signed in - a real OpenID
+ *     Connect {@code sub}, not a placeholder.</li>
  * </ol>
  *
  * <h2>The consumer is a second, separate application context</h2>
@@ -106,6 +113,9 @@ class TenantRegistryE2EIT {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private KurrentDBClient kurrentDBClient;
 
     private final RestClient rest = RestClient.create();
 
@@ -175,6 +185,30 @@ class TenantRegistryE2EIT {
             // issuer validator and key selector of the tenant that went away.
             assertThat(removals.removed).contains(tenantId);
         });
+
+    }
+
+    /**
+     * jtenman's event stream is the provisioning audit trail, so every event has to name who caused it.
+     * <p>
+     * Worth an end-to-end assertion rather than a unit test of {@code AuditedRepository}: the subject id
+     * only becomes real once a token from a real identity provider has been decoded, and the value here
+     * is the administrator's actual OpenID Connect {@code sub} - the same one Keycloak would delete a
+     * user by.
+     */
+    @Test
+    void theStoredEventsNameTheAdministratorWhoCausedThem() throws Exception {
+
+        final String realm = registerAndSubscribeTenant();
+
+        final String metadata = readFirstEventMetadata("TENANT-" + realm);
+
+        // The meta type names the payload below it and is what the read side resolves in the registry.
+        assertThat(metadata).contains("\"meta-type\":\"CommandMeta\"");
+        assertThat(metadata.replaceAll("\\s", "")).containsOnlyOnce("\"CommandMeta\":{");
+
+        // Not "anonymousUser", and not the client id either - the subject of the human who signed in.
+        assertThat(metadata).contains(administratorSubjectId());
 
     }
 
@@ -260,6 +294,38 @@ class TenantRegistryE2EIT {
         assertThat(response.getStatusCode().value())
                 .describedAs("%s for realm %s: %s", type, realm, response.getBody())
                 .isEqualTo(200);
+    }
+
+    /**
+     * Reads the metadata of the first event of a stream, straight from the event store.
+     *
+     * @param streamName Name of the aggregate's stream.
+     *
+     * @return Metadata as it was stored.
+     *
+     * @throws Exception Reading the stream failed.
+     */
+    private String readFirstEventMetadata(final String streamName) throws Exception {
+        final List<ResolvedEvent> events = kurrentDBClient
+                .readStream(streamName, ReadStreamOptions.get().forwards().fromStart().maxCount(1))
+                .get().getEvents();
+        assertThat(events).describedAs("events in stream " + streamName).isNotEmpty();
+        return new String(events.getFirst().getOriginalEvent().getUserMetadata(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Returns the {@code sub} of the administrator, read out of their own token - so the expected value
+     * comes from Keycloak rather than from this test.
+     *
+     * @return Subject id.
+     */
+    private String administratorSubjectId() {
+        final String payload = keycloak.administratorToken().split("\\.")[1];
+        final String json = new String(java.util.Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
+        final java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("\"sub\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+        assertThat(matcher.find()).describedAs("sub claim in %s", json).isTrue();
+        return matcher.group(1);
     }
 
     private ResponseEntity<String> get(final String path, final String token) {

@@ -6,6 +6,7 @@ import org.fuin.cqrs4j.core.CommandExecutionContext;
 import org.fuin.cqrs4j.core.CommandExecutionFailedException;
 import org.fuin.cqrs4j.core.CommandHandler;
 import org.fuin.cqrs4j.core.Result;
+import org.fuin.cqrs4j.esc.AuditedRepository;
 import org.fuin.cqrs4j.jackson.SimpleResult;
 import org.fuin.ddd4j.core.EntityIdPath;
 import org.fuin.dsl.cqrs.common.exceptions.EntityInStateDeletedException;
@@ -50,7 +51,7 @@ public class DeleteTenantCommandHandler implements CommandHandler<DeleteTenantCo
         try {
             final Tenant tenant = repository.read(cmd.getAggregateRootId());
             tenant.deleteTenant(cmd.getReason(), service);
-            repository.update(tenant);
+            AuditedRepository.update(repository, tenant, context);
             // The aggregate's stream is deliberately NOT deleted here.
             //
             // Deleting it immediately after appending TenantDeletedEvent races the projection: the read

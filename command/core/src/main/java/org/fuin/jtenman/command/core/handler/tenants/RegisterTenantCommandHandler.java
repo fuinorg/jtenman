@@ -4,6 +4,7 @@ import org.fuin.cqrs4j.core.CommandExecutionContext;
 import org.fuin.cqrs4j.core.CommandExecutionFailedException;
 import org.fuin.cqrs4j.core.CommandHandler;
 import org.fuin.cqrs4j.core.Result;
+import org.fuin.cqrs4j.esc.AuditedRepository;
 import org.fuin.cqrs4j.jackson.SimpleResult;
 import org.fuin.jtenman.command.api.tenants.RegisterTenantCommand;
 import org.fuin.jtenman.command.core.domain.tenants.AbstractTenant.RegisterTenantService;
@@ -51,7 +52,7 @@ public class RegisterTenantCommandHandler implements CommandHandler<RegisterTena
             throws CommandExecutionFailedException {
         try {
             final Tenant tenant = new Tenant(cmd.getAggregateRootId(), cmd.getRealm(), service);
-            repository.add(tenant);
+            AuditedRepository.add(repository, tenant, context);
             return SimpleResult.ok();
         } catch (final AggregateAlreadyExistsException ex) {
             // The realm was gone from Keycloak but the tenant's history was not, so the domain check

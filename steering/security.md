@@ -115,6 +115,30 @@ This is the half of the "no technical user" rule that is kept absolutely: an app
 credential that can create users or map roles is a categorically larger risk than one that can read a
 list of realm names.
 
+## Who did it is recorded
+
+Every event jtenman appends carries an `org.fuin.cqrs4j.esc.CommandMeta` holding the **subject id of the
+caller who caused it**. The provisioning history is therefore also the audit trail: who registered a
+tenant, who subscribed it to an application, who suspended it, who deleted it.
+
+The handlers get that by saving through `AuditedRepository.add(repository, aggregate, context)` rather
+than `repository.add(aggregate)`. The difference is not cosmetic - the one-argument overloads store the
+events with **no metadata at all**, and events are immutable, so an event written without the acting user
+can never gain it later. The failure is invisible while it happens: the command succeeds, the tenant is
+provisioned, and the gap only shows up when somebody needs the audit and finds it empty. That is why
+`ArchitectureTest` in `command/core` fails the build on a one-argument save instead of leaving it to
+review.
+
+`TenantRegistryE2EIT` proves the value is real rather than a placeholder: it registers a tenant as an
+administrator who signed in to an actual Keycloak, reads the first event straight out of the event store,
+and asserts the metadata carries that administrator's own OpenID Connect `sub` - the same identifier
+Keycloak would delete the user by.
+
+**Only the subject id, never a name or an address.** That is the same rule as for
+`AdministratorInvitedEvent` below, and for the same reason: an opaque id stops resolving to anybody once
+the user is removed, while an email address written into an immutable event is personal data no deletion
+request can reach.
+
 ## Bringing a tenant to life takes three steps, in order
 
 | Step | Operation | Effect in Keycloak |
