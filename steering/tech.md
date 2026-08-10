@@ -151,7 +151,7 @@ with an outbox, and no longer something to solve inside a handler.
 ### Verifying models
 
 ```bash
-java -jar ~/git/ddd-cqrs-dsl/maven/console/target/ddd-cqrs-dsl-console.jar model
+java -jar <base-path>/ddd-cqrs-dsl/maven/console/target/ddd-cqrs-dsl-console.jar model
 ```
 
 Pass the **directory**, not a single file, so cross-file references resolve. Exit code `1` on any error.
