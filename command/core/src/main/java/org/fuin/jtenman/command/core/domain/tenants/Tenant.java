@@ -99,8 +99,11 @@ public final class Tenant extends AbstractTenant {
         requireNotDeleted();
 
         // The address goes to Keycloak and no further: only the subject id it hands back is applied, so
-        // no personal data enters the event stream.
-        final SubjectId invited = inviteAdministratorService.inviteRealmAdministrator(realmName(), email);
+        // no personal data enters the event stream. The subscriptions go with it because the roles the
+        // administrators group has to carry depend on them, and this aggregate is the only place that
+        // knows what this tenant is subscribed to.
+        final SubjectId invited = inviteAdministratorService.inviteRealmAdministrator(realmName(), email,
+                List.copyOf(applications));
 
         // Apply events
         apply(AdministratorInvitedEvent.builder()

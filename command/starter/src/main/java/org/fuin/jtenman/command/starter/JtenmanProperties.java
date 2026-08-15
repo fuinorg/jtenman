@@ -69,6 +69,10 @@ public class JtenmanProperties {
 
         private final String audience;
 
+        private final List<String> realmRoles;
+
+        private final List<String> realmManagementRoles;
+
         /**
          * Constructor with all data.
          *
@@ -76,13 +80,22 @@ public class JtenmanProperties {
          * @param displayName Human readable name.
          * @param clientId Keycloak client created in a subscribing tenant's realm.
          * @param audience Value the audience mapper emits, which the application validates.
+         * @param realmRoles The application's own roles, created in a subscribing tenant's realm and
+         *                   carried by the administrators group. Empty for an application that has none.
+         * @param realmManagementRoles Client roles of Keycloak's {@code realm-management} client the
+         *                             administrators group needs, so the application can administer
+         *                             logins under the caller's own token. Empty if it never does.
          */
         public Application(final String id, @Nullable final String displayName, final String clientId,
-                           final String audience) {
+                           final String audience, @Nullable final List<String> realmRoles,
+                           @Nullable final List<String> realmManagementRoles) {
             this.id = Objects.requireNonNull(id, "id==null");
             this.displayName = displayName;
             this.clientId = Objects.requireNonNull(clientId, "clientId==null");
             this.audience = Objects.requireNonNull(audience, "audience==null");
+            this.realmRoles = realmRoles == null ? List.of() : List.copyOf(realmRoles);
+            this.realmManagementRoles = realmManagementRoles == null
+                    ? List.of() : List.copyOf(realmManagementRoles);
         }
 
         /**
@@ -120,6 +133,24 @@ public class JtenmanProperties {
          */
         public String getAudience() {
             return audience;
+        }
+
+        /**
+         * Returns the application's own realm roles.
+         *
+         * @return Role names, never null.
+         */
+        public List<String> getRealmRoles() {
+            return realmRoles;
+        }
+
+        /**
+         * Returns the realm-management client roles the administrators group needs.
+         *
+         * @return Role names, never null.
+         */
+        public List<String> getRealmManagementRoles() {
+            return realmManagementRoles;
         }
 
     }

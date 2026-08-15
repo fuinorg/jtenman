@@ -3,6 +3,7 @@ package org.fuin.jtenman.query.starter;
 import org.fuin.jtenman.internal.EventStoreProperties;
 import io.kurrent.dbclient.KurrentDBClientSettings;
 import io.kurrent.dbclient.KurrentDBProjectionManagementClient;
+import org.fuin.cqrs4j.core.QueryAuthorizer;
 import org.fuin.esc.api.ProjectionAdminEventStore;
 import org.fuin.esc.esgrpc.GrpcProjectionAdminEventStore;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -30,6 +31,22 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EntityScan("org.fuin.jtenman.query.core.view")
 public class QueryProjectionAutoConfiguration {
+
+    /**
+     * Creates the authorizer the generated view controllers consult.
+     * <p>
+     * Required rather than optional: the generated controllers take one as a constructor argument, so
+     * without this bean the context does not start. That is deliberate on the framework's side - an
+     * application must say what its reads are guarded by instead of getting a silent default - and
+     * {@link PathRuleQueryAuthorizer} is jtenman's answer.
+     *
+     * @return Authorizer permitting every view method that has passed the path rule.
+     */
+    @Bean
+    @ConditionalOnMissingBean(QueryAuthorizer.class)
+    public QueryAuthorizer queryAuthorizer() {
+        return new PathRuleQueryAuthorizer();
+    }
 
     /**
      * Creates the client used to administer KurrentDB projections.

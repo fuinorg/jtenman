@@ -80,21 +80,50 @@ public class ApplicationCatalogue {
 
     /**
      * One application of the system.
+     * <p>
+     * The two role lists belong here for the same reason the client id and the audience do: they change
+     * with a release of the application, not with anything a tenant does. That also means they must
+     * <b>never</b> be written into {@code ApplicationSubscribedEvent} - only the {@link ApplicationId} is
+     * ever recorded, because an immutable event carrying a deployment detail freezes it into history.
      *
      * @param id Identifier used in commands and in the tenant list.
      * @param displayName Human readable name.
      * @param clientId Keycloak client created in a subscribing tenant's realm.
      * @param audience Value the client's audience mapper emits, which the application validates.
+     * @param realmRoles The application's own roles, created in the tenant's realm and carried by the
+     *                   administrators group. Realm roles, not client roles: an application's JWT
+     *                   converter reads {@code realm_access.roles}, and a client role is invisible there -
+     *                   the check then fails with nothing wrong in Keycloak's UI to point at.
+     * @param realmManagementRoles Client roles of the {@code realm-management} client the administrators
+     *                             group needs so that the application can administer logins under the
+     *                             caller's own token. These are client roles because they belong to
+     *                             Keycloak's own admin API rather than to the application.
      */
-    public record Entry(String id, @Nullable String displayName, String clientId, String audience) {
+    public record Entry(String id, @Nullable String displayName, String clientId, String audience,
+                        List<String> realmRoles, List<String> realmManagementRoles) {
 
         /**
-         * Compact constructor validating the mandatory parts.
+         * Compact constructor validating the mandatory parts and defaulting the role lists.
          */
         public Entry {
             Objects.requireNonNull(id, "id==null");
             Objects.requireNonNull(clientId, "clientId==null");
             Objects.requireNonNull(audience, "audience==null");
+            realmRoles = realmRoles == null ? List.of() : List.copyOf(realmRoles);
+            realmManagementRoles = realmManagementRoles == null ? List.of() : List.copyOf(realmManagementRoles);
+        }
+
+        /**
+         * Constructor for an application that needs no roles provisioned.
+         *
+         * @param id Identifier used in commands and in the tenant list.
+         * @param displayName Human readable name.
+         * @param clientId Keycloak client created in a subscribing tenant's realm.
+         * @param audience Value the client's audience mapper emits, which the application validates.
+         */
+        public Entry(final String id, @Nullable final String displayName, final String clientId,
+                     final String audience) {
+            this(id, displayName, clientId, audience, List.of(), List.of());
         }
 
     }

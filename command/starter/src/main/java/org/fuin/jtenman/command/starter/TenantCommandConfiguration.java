@@ -46,7 +46,7 @@ public class TenantCommandConfiguration {
     public ApplicationCatalogue applicationCatalogue(final JtenmanProperties properties) {
         return new ApplicationCatalogue(properties.getApplications().stream()
                 .map(app -> new ApplicationCatalogue.Entry(app.getId(), app.getDisplayName(), app.getClientId(),
-                        app.getAudience()))
+                        app.getAudience(), app.getRealmRoles(), app.getRealmManagementRoles()))
                 .toList());
     }
 

@@ -1,5 +1,6 @@
 package org.fuin.jtenman.command.core.domain.tenants;
 
+import java.util.List;
 import org.fuin.ddd4j.core.AbstractAggregateRoot;
 import org.fuin.ddd4j.core.EntityType;
 import org.fuin.dsl.cqrs.common.basics.EmailAddress;
@@ -156,14 +157,15 @@ public abstract class AbstractTenant extends AbstractAggregateRoot<TenantRealmId
     public interface InviteAdministratorService {
         
         /**
-         * Creates a person in the tenant's realm, puts them into the group carrying the tenant-administrator role - roles are never assigned to a user directly - and sends a one-time link asking them to set a password. No credential is set here.
+         * Creates a person in the tenant's realm, puts them into the group carrying the tenant-administrator role - roles are never assigned to a user directly - and sends a one-time link asking them to set a password. No credential is set here. * The subscriptions are passed in because which roles that group has to carry depends on which applications the tenant uses, and only the aggregate knows that. Subscribing and inviting are independent commands that may arrive in either order, so this re-ensures the roles of everything subscribed so far rather than assuming a subscription came first.
          *
          * @param realm The realm to create the person in.
          * @param email Where to send the invitation.
+         * @param subscribedApplications The applications this tenant uses, whose roles the group must carry.
          *
          * @return Subject id of the created person.
          */
-        public SubjectId inviteRealmAdministrator(final RealmName realm, final EmailAddress email);
+        public SubjectId inviteRealmAdministrator(final RealmName realm, final EmailAddress email, final List<ApplicationId> subscribedApplications);
         
     }
     

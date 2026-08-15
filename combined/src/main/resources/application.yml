@@ -33,6 +33,18 @@ jtenman:
       display-name: Melkheftken
       client-id: melkheftken-api
       audience: melkheftken-api
+      # Created in a subscribing tenant's realm and mapped onto the tenant-administrators group.
+      # Realm roles, not client roles: melkheftken's JWT converter reads realm_access.roles only, and a
+      # client role is invisible there - the check then fails with nothing wrong in Keycloak to point at.
+      realm-roles:
+        - melkheftken-user
+        - melkheftken-org-admin
+      # Client roles of Keycloak's own realm-management client, so melkheftken can create and remove
+      # logins under the caller's token rather than holding an admin credential of its own. Known gap:
+      # plain manage-users is realm-wide, wider than the design wants - see the adapter's javadoc.
+      realm-management-roles:
+        - manage-users
+        - view-users
 
 eventstore:
   url: ${KURRENTDB_URL:kurrentdb://localhost:2113?tls=false}
