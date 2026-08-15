@@ -38,7 +38,7 @@ jtenman:
       # client role is invisible there - the check then fails with nothing wrong in Keycloak to point at.
       realm-roles:
         - melkheftken-user
-        - melkheftken-org-admin
+        - melkheftken-admin
       # Client roles of Keycloak's own realm-management client, so melkheftken can create and remove
       # logins under the caller's token rather than holding an admin credential of its own. Known gap:
       # plain manage-users is realm-wide, wider than the design wants - see the adapter's javadoc.

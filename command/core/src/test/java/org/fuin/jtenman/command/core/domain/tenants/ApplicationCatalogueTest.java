@@ -33,8 +33,8 @@ public class ApplicationCatalogueTest {
     public void testRolesAreKept() {
         final ApplicationCatalogue.Entry entry = new ApplicationCatalogue.Entry("melkheftken", "Melkheftken",
                 "melkheftken-api", "melkheftken-api",
-                List.of("melkheftken-user", "melkheftken-org-admin"), List.of("manage-users", "view-users"));
-        assertThat(entry.realmRoles()).containsExactly("melkheftken-user", "melkheftken-org-admin");
+                List.of("melkheftken-user", "melkheftken-admin"), List.of("manage-users", "view-users"));
+        assertThat(entry.realmRoles()).containsExactly("melkheftken-user", "melkheftken-admin");
         assertThat(entry.realmManagementRoles()).containsExactly("manage-users", "view-users");
     }
 

@@ -52,7 +52,7 @@ class KeycloakTenantAdapterIT {
 
     private static final String USER_ROLE = "melkheftken-user";
 
-    private static final String ADMIN_ROLE = "melkheftken-org-admin";
+    private static final String ADMIN_ROLE = "melkheftken-admin";
 
     private static final String ADMIN_GROUP = "tenant-administrators";
 
