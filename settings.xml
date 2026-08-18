@@ -8,11 +8,36 @@
          groups. The scanner's group is not one of Maven's defaults, and the build passes
          "-s settings.xml", so the runner's own settings are not consulted either - without this entry
          the build fails with the fairly unhelpful "No plugin found for prefix 'sonar'". -->
+    <!-- Credentials for publishing, taken from the workflow's environment. The id is the one the
+         'central-sonatype-release' profile names as its publishingServerId, and it is spelled the same in
+         every fuinorg repository. -->
+    <servers>
+
+        <server>
+            <id>central-sonatype</id>
+            <username>${env.OSS_SONATYPE_USERNAME}</username>
+            <password>${env.OSS_SONATYPE_TOKEN}</password>
+        </server>
+
+    </servers>
+
     <pluginGroups>
         <pluginGroup>org.sonarsource.scanner.maven</pluginGroup>
     </pluginGroups>
 
     <profiles>
+
+        <!-- Only the passphrase: the key itself is imported into the runner's keyring by the workflow step
+             before the build, the same way it is done in every other fuinorg repository. -->
+        <profile>
+
+            <id>central-sonatype-release</id>
+
+            <properties>
+                <gpg.passphrase>${env.OSS_SONATYPE_GPG_PASSPHRASE}</gpg.passphrase>
+            </properties>
+
+        </profile>
 
         <profile>
 

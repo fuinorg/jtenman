@@ -18,9 +18,57 @@
 
     <name>jtenman</name>
     <description>Tenant control plane - registers tenants and the applications they use (CQRS)</description>
+    <!-- Each published module repeats this url instead of inheriting it: Maven appends the module's own
+         path to an inherited one, and the 'child.project.url.inherit.append.path' attribute that is meant
+         to stop that has no effect on Maven 3.9.15. The scm url below does not need the same treatment -
+         there the attribute is honoured. -->
+    <url>https://github.com/fuinorg/jtenman/</url>
+
+    <!--
+        Declared here rather than inherited, and that is the point of having it at all. The parent is
+        spring-boot-starter-parent, which declares its own url, licenses, developers and scm - so an
+        artifact published without this block would go out under the Apache licence, with "Spring /
+        VMware, Inc." as its developer and a spring-projects GitHub url. Same licence as every other
+        fuinorg artifact, spelled the way org.fuin:pom spells it.
+    -->
+    <licenses>
+        <license>
+            <name>LGPL</name>
+            <url>http://www.fsf.org/licensing/licenses/lgpl.html</url>
+            <distribution>repo</distribution>
+            <comments>GNU Lesser General Public License</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>michael-schnell</id>
+            <name>Michael Schnell</name>
+            <organization>fuin.org</organization>
+            <organizationUrl>http://www.fuin.org/</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm child.scm.url.inherit.append.path="false">
+        <url>https://github.com/fuinorg/jtenman/</url>
+        <connection>scm:git:git://github.com/fuinorg/jtenman.git</connection>
+        <developerConnection>scm:git:git@github.com:fuinorg/jtenman.git</developerConnection>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/fuinorg/jtenman/issues</url>
+    </issueManagement>
 
     <properties>
         <java.version>25</java.version>
+        <!--
+            Whether a module is left out of the publish, and the default is to leave it out: a consumer
+            wants the libraries that land on its own class path, not the control plane. The three that say
+            'false' - shared, query/api and starter - are the whole of what jtenman offers anybody else.
+            Anything new is excluded until somebody decides otherwise, which is the safe direction.
+        -->
+        <jtenman.publishing.skip>true</jtenman.publishing.skip>
         <utils4.version>0.16.1-SNAPSHOT</utils4.version>
         <objects4j.version>0.12.0-SNAPSHOT</objects4j.version>
         <ddd4j.version>0.8.0-SNAPSHOT</ddd4j.version>
@@ -293,6 +341,50 @@
 
         <plugins>
 
+            <!--
+                Publishes a pom with no <parent>.
+
+                Every dependency version in this project comes from spring-boot-starter-parent or from the
+                BOMs imported below, so an unflattened pom is unusable to a consumer without resolving the
+                whole chain above it. Flattening writes the resolved versions inline, which means the
+                parent and the aggregator poms do not have to be published at all - the three libraries
+                stand on their own.
+
+                'oss' mode keeps the name, description, url, licences, developers and scm that Central
+                requires; the metadata block at the top of this file is what those are filled from, and
+                without it they would be filled from spring-boot-starter-parent.
+
+                In the main build rather than in the release profile on purpose: what is installed into
+                ~/.m2 is then exactly what gets deployed, so a consumer resolving locally exercises what
+                its CI will resolve from Central. Pom-packaged modules are skipped by default, so the
+                aggregators keep their own poms.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.8.0</version>
+                <configuration>
+                    <flattenMode>oss</flattenMode>
+                    <updatePomFile>true</updatePomFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Integration tests are named "*IT" and spin up containers, so they run in the "verify"
                  phase via failsafe - surefire's default includes ("*Test") deliberately do not match
                  them, keeping "mvn test" free of any container runtime. -->
@@ -343,5 +435,140 @@
         </plugins>
 
     </build>
+
+    <profiles>
+
+        <!--
+            Publishes to Sonatype Central: the same treatment for a snapshot as for a release.
+
+            jtenman-starter is written for somebody else's class path, and until this existed nothing put
+            it anywhere that somebody else's build could reach - the workflow ran "verify", so the artifact
+            lived only in the ~/.m2 of whoever built it. A consumer's CI resolves from central-snapshots
+            and got a 404, which reads like a broken dependency in the consumer rather than a missing step
+            here.
+
+            Every other fuinorg repository inherits this from org.fuin:pom. This one has
+            spring-boot-starter-parent instead and therefore repeats it - the same plugins, the same
+            versions and the same 'central-sonatype' server id, so that a release needs no second
+            mechanism and no decision at the time it is made.
+        -->
+        <profile>
+
+            <id>central-sonatype-release</id>
+
+            <build>
+
+                <plugins>
+
+                    <!-- The passphrase reaches gpg as a system property; it arrives from the workflow's
+                         environment through settings.xml. -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.3.0</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>set-system-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <properties>
+                                        <property>
+                                            <name>gpg.passphrase</name>
+                                            <value>${gpg.passphrase}</value>
+                                        </property>
+                                    </properties>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Central requires signatures for a release and not for a snapshot. Signing both
+                         anyway is what makes the two paths identical, which is the point. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.8</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!--
+                        Sources and javadoc are attached here rather than on every build: Central needs
+                        them for a release, and nineteen javadoc runs are not worth paying for on the path
+                        a developer uses.
+
+                        Both are tied to the same switch as the publish itself, because a module nobody
+                        publishes needs neither - and running them anyway is not merely wasteful: javadoc
+                        fails outright on jtenman-query-server, where jakarta.servlet arrives twice, once
+                        on its own and once inside tomcat-embed-core. That is a real split package, but it
+                        is a property of an application module that no one consumes as a library.
+                    -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <configuration>
+                            <skipSource>${jtenman.publishing.skip}</skipSource>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <configuration>
+                            <skip>${jtenman.publishing.skip}</skip>
+                            <!-- Keep the real checks - broken references, bad HTML, syntax - but do not
+                                 fail a publish over a missing comment on a boilerplate member. -->
+                            <doclint>all,-missing</doclint>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central-sonatype</publishingServerId>
+                            <skipPublishing>${jtenman.publishing.skip}</skipPublishing>
+                        </configuration>
+                    </plugin>
+
+                </plugins>
+
+            </build>
+
+        </profile>
+
+    </profiles>
 
 </project>

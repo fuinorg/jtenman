@@ -40,8 +40,12 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       # Runs the unit tests and the integration tests. The latter start KurrentDB, PostgreSQL and
-      # Keycloak through Testcontainers, using the Docker daemon the runner provides. Nothing is
-      # deployed.
+      # Keycloak through Testcontainers, using the Docker daemon the runner provides.
+      #
+      # Two steps that exclude each other: a push to main publishes the libraries, everything else only
+      # proves the build. That split is the one every other fuinorg repository makes, and the reason is
+      # that a branch or a pull request must not be able to overwrite the artifact an administered
+      # application resolves.
       #
       # "-s settings.xml" adds the snapshot repositories every org.fuin dependency is resolved from -
       # jtenman builds against SNAPSHOTs of cqrs-4-java, ddd-4-java and esc, so "-U" is not optional
@@ -50,4 +54,23 @@ jobs:
       # The Error Prone / NullAway "--add-exports jdk.compiler/..." flags come from .mvn/jvm.config in
       # this repository, so nothing has to be passed here for them.
       - name: Build with Maven
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         run: mvn clean verify -U -B --file pom.xml -s settings.xml
+
+      - name: Import GPG key
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.OSS_SONATYPE_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.OSS_SONATYPE_GPG_PASSPHRASE }}
+
+      # jtenman-starter is written for somebody else's class path, so building it without publishing it
+      # leaves every consumer's CI resolving a 404. Snapshots are signed and published exactly the way a
+      # release will be - see the profile in pom.xml - so releasing needs no second mechanism.
+      - name: Build and deploy with Maven
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          OSS_SONATYPE_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
+          OSS_SONATYPE_TOKEN: ${{ secrets.OSS_SONATYPE_TOKEN }}
+          OSS_SONATYPE_GPG_PASSPHRASE: ${{ secrets.OSS_SONATYPE_GPG_PASSPHRASE }}
+        run: mvn clean deploy -Pcentral-sonatype-release -U -B --file pom.xml -s settings.xml

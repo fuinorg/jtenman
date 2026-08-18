@@ -28,6 +28,19 @@
         the 'tenant-admin' role.
     -->
 
+    <!-- One of the three libraries a consumer of jtenman puts on its own class path, so this one is
+         published; see the root pom for why that is the exception rather than the rule.
+
+         The url is repeated rather than inherited because Maven appends the module's path to an inherited
+         one - producing '.../jtenman/jtenman-shared/', which is not a page that exists - and the root
+         pom's 'child.project.url.inherit.append.path=false' does not stop it on Maven 3.9.15. Saying it
+         here is one line and cannot be got wrong. -->
+    <url>https://github.com/fuinorg/jtenman/</url>
+
+    <properties>
+        <jtenman.publishing.skip>false</jtenman.publishing.skip>
+    </properties>
+
     <dependencies>
 
         <!-- compile -->

@@ -115,7 +115,12 @@
         <plugins>
 
             <!-- The DSL is private to jtenman: nothing outside imports this model, so the artifact is
-                 never published. Only the generated command/query API jars are (see steering/tech.md). -->
+                 never published. Only the generated command/query API jars are (see steering/tech.md).
+                 There would also be nothing in it: the .cqrs files live beside this pom rather than under
+                 a resource root, and src/main/java holds a .gitkeep, so the jar would be empty and - with
+                 no sources - would have no javadoc jar for Central to accept. A model that is meant to be
+                 shared is packaged the way cqrs-common-model is: packaging 'pom' and an assembly zip,
+                 resolved by the DSL rather than by a class path. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
