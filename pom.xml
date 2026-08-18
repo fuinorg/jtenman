@@ -49,7 +49,13 @@
         </developer>
     </developers>
 
-    <scm child.scm.url.inherit.append.path="false">
+    <!-- Three attributes, not one: url, connection and developerConnection each have their own, and
+         without all three Maven appends the module's directory - publishing jtenman-shared with a
+         connection of 'scm:git:git://github.com/fuinorg/jtenman.git/jtenman-shared', which is not a
+         repository. Found by reading the pom that was actually published, not this file. -->
+    <scm child.scm.url.inherit.append.path="false"
+         child.scm.connection.inherit.append.path="false"
+         child.scm.developerConnection.inherit.append.path="false">
         <url>https://github.com/fuinorg/jtenman/</url>
         <connection>scm:git:git://github.com/fuinorg/jtenman.git</connection>
         <developerConnection>scm:git:git@github.com:fuinorg/jtenman.git</developerConnection>
