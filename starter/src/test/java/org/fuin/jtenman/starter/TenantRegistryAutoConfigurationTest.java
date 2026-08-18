@@ -187,6 +187,24 @@ class TenantRegistryAutoConfigurationTest {
 
     }
 
+    @Test
+    void nothingIsContributedWithoutAUrl() {
+
+        // The starter has to be able to sit on an application's class path without taking it over. Taking
+        // this repository moves an application's trust boundary out of its own configuration and into the
+        // registry, and makes its authentication depend on the registry being reachable - a decision it
+        // cannot take deliberately if adding a dependency is enough to make it.
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(
+                        TenantListClientCredentialsAutoConfiguration.class,
+                        TenantRegistryAutoConfiguration.class))
+                .withPropertyValues("jtenman.registry.application=" + APPLICATION)
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(JtenmanTenantRepository.class);
+                    assertThat(context).doesNotHaveBean(TenantRegistryRefresher.class);
+                });
+    }
+
     private ApplicationContextRunner runner() {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(

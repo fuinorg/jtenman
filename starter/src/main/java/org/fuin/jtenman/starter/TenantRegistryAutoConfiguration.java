@@ -18,6 +18,7 @@ import org.fuin.jtenman.shared.domain.tenants.ApplicationId;
 import org.fuin.objects4j.jackson.Objects4JJacksonModule;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -54,6 +55,14 @@ import java.util.List;
  * Neither has a default; see {@link TenantRegistryProperties}. The remaining settings - refresh
  * interval, staleness bound, timeouts - do.
  *
+ * <p><b>Nothing here is contributed until {@code url} is set</b>, so an application can carry this starter
+ * on its class path and stay on whatever tenant repository it had. That matters because taking this one
+ * changes where an application's trust boundary lives: instead of an issuer in its own configuration, the
+ * set of realms it accepts tokens from becomes whatever the registry says, and its authentication then
+ * depends on the registry being reachable - {@link JtenmanTenantRepository#usable()} is false until the
+ * first successful pull and false again once the list is staler than the bound. An application should
+ * decide that deliberately, which it cannot do if adding a dependency is enough to switch it.
+ *
  * <h2>Why this starter brings its own object mapper</h2>
  * <p>
  * A {@code TenantDetails} is made of value objects, and Jackson needs the matching modules to read one:
@@ -64,6 +73,7 @@ import java.util.List;
  * the tenant-list call and nothing else sees it.
  */
 @AutoConfiguration(before = KeycloakSecurityAutoConfiguration.class)
+@ConditionalOnProperty(prefix = TenantRegistryProperties.PREFIX, name = "url")
 @EnableConfigurationProperties(TenantRegistryProperties.class)
 public class TenantRegistryAutoConfiguration {
 
