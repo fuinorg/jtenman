@@ -255,6 +255,37 @@ makes decoding throw - a **500 in every consuming application**, not a clean rej
 in the control plane, where a person sees the message. A customer called "Müller-Schmidt GmbH" cannot have
 a realm named after them.
 
+## A realm name has to be its issuer's last segment, and the replica refuses it otherwise
+
+A resource server has exactly one way of knowing which tenant a request belongs to: the **last path
+segment of the token's issuer**. jtenman's catalogue stores the realm name as its own field beside the
+issuer URI, and nothing ties the two - `KeycloakTenantAdapter` builds the issuer from the realm for realms
+jtenman creates itself, but an externally supplied issuer can say anything. Two rows are therefore
+inadmissible, and `JtenmanTenantRepository` drops both:
+
+| The row                                    | What it would mean                                                           |
+|--------------------------------------------|------------------------------------------------------------------------------|
+| Realm is not its issuer's last segment     | **One tenant split in two** - the list names it one way, its tokens another   |
+| One realm name, two issuers                | **Two tenants merged into one** - shared streams, schema and checkpoints      |
+
+**Neither is a forgery route**, and that is why they have to be refused here. A caller still has to hold a
+token signed by a realm on this list; every request involved is legitimate and correctly authorised, so
+nothing further down is ever going to object. The split shows up on a consuming application's query side -
+a routing datasource with no lenient fallback reports the unknown key - but not on its event store, where
+streams written under one name and projected under the other simply produce a read model that stays empty
+while every health check passes.
+
+**Entries are dropped, not the pull failed.** A failed refresh means "could not ask jtenman", which leaves
+the previous list standing and eventually stops the application serving anybody. That is the right answer
+to an unreachable control plane and the wrong one to a list that arrived with a bad row in it: the other
+tenants in it are answerable and keep working. A tenant that *becomes* ambiguous is withdrawn through
+`TenantRemovedEvent`, so the caches downstream are evicted rather than left serving it.
+
+**Registration would be the better place for the first of the two**, next to the realm-name shape rule
+above, where a person sees the message instead of an operator finding it in a log. The replica check is
+needed either way - the list is a trust boundary and an application must not assume the control plane
+validated it - so this is an addition, not a move.
+
 ## Two layers guard an administered application
 
 Neither is redundant:

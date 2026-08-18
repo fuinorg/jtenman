@@ -16,6 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,24 @@ import java.util.stream.Stream;
  * serving a snapshot of unbounded age - means a suspended tenant keeps working for as long as the
  * outage lasts. Set the property to zero to trade that guarantee for availability; the choice is real
  * and belongs to the operator, not to this class.
+ *
+ * <h2>Where the realm name has to line up</h2>
+ * <p>
+ * A resource server has one way of knowing which tenant a request belongs to: <b>the last path segment
+ * of the token's issuer</b>. That makes two rows in jtenman's catalogue inadmissible, and both are
+ * dropped here rather than left to be discovered later:
+ * <ul>
+ * <li>A realm name that is <b>not</b> its issuer's last segment. The list would then name the tenant one
+ *     way and its tokens another - one tenant split in two, with the data going to whichever half the
+ *     writer happened to use.</li>
+ * <li>One realm name registered for <b>two issuers</b>. They are separate organisations verified against
+ *     separate key sets, and they would land on one set of streams, one schema and one set of
+ *     checkpoints - two tenants merged into one, reported by nothing.</li>
+ * </ul>
+ * <p>
+ * Neither is a forgery route - a caller still has to hold a token signed by a realm on this list - which
+ * is exactly why they are worth refusing here: every request involved is legitimate, so nothing further
+ * down is ever going to object.
  */
 @ThreadSafe
 public class JtenmanTenantRepository implements JwtTenantRepository {
@@ -123,14 +142,7 @@ public class JtenmanTenantRepository implements JwtTenantRepository {
      */
     public void refresh() {
 
-        final Map<String, TenantId> current = new LinkedHashMap<>();
-        for (final TenantDetails details : fetch()) {
-            // jtenman leaves suspended tenants out of the answer. Filtering again costs nothing and
-            // means a change on that side cannot silently widen what this application accepts.
-            if (details.getStatus() == TenantStatus.ACTIVE) {
-                current.put(details.getIssuerUri().asBaseType(), new TenantId(details.getRealm().asBaseType()));
-            }
-        }
+        final Map<String, TenantId> current = admissible(fetch());
 
         final Map<String, TenantId> previous = admitted;
         admitted = Map.copyOf(current);
@@ -214,6 +226,91 @@ public class JtenmanTenantRepository implements JwtTenantRepository {
      */
     protected long now() {
         return System.currentTimeMillis();
+    }
+
+    /**
+     * Reduces jtenman's answer to the entries this application may act on.
+     * <p>
+     * Entries are dropped rather than the pull being failed. A failed {@link #refresh()} means "could not
+     * ask", which leaves the previous list standing and eventually stops the application from serving
+     * anybody; that is the right answer to an unreachable jtenman and the wrong one to a list that
+     * arrived and had a bad row in it. The other tenants in that list are answerable and keep working,
+     * and the entry that cannot be acted on is simply not admitted - which is also what already happens
+     * to a suspended tenant.
+     *
+     * @param details What jtenman said.
+     *
+     * @return Issuer URI to tenant identifier, for the entries that survived.
+     */
+    private Map<String, TenantId> admissible(final List<TenantDetails> details) {
+
+        final Map<String, TenantId> candidates = new LinkedHashMap<>();
+        for (final TenantDetails tenant : details) {
+            // jtenman leaves suspended tenants out of the answer. Filtering again costs nothing and
+            // means a change on that side cannot silently widen what this application accepts.
+            if (tenant.getStatus() != TenantStatus.ACTIVE) {
+                continue;
+            }
+            final String issuerUri = tenant.getIssuerUri().asBaseType();
+            final String realm = tenant.getRealm().asBaseType();
+            if (!realm.equals(realmSegmentOf(issuerUri))) {
+                // One tenant, two identifiers: this list would set up schemas, datasources and
+                // per-tenant loops under jtenman's realm name, while a token from that realm arrives as
+                // the segment of its issuer. The query side reports the mismatch, the event store does
+                // not - streams are written under one name and projected under the other, and the read
+                // model simply stays empty.
+                LOG.error("Tenant '{}' is not admitted: its issuer '{}' ends in '{}', and a resource "
+                        + "server derives the tenant from that segment alone - the two have to be the "
+                        + "same. Correct the realm name or the issuer URI in jtenman.",
+                        realm, issuerUri, realmSegmentOf(issuerUri));
+                continue;
+            }
+            candidates.put(issuerUri, new TenantId(realm));
+        }
+        return withoutAmbiguousRealms(candidates);
+    }
+
+    /**
+     * Drops every entry whose realm name is claimed by more than one issuer.
+     * <p>
+     * Both are dropped, not one: the two are different issuers verified against different key sets, and
+     * there is nothing here that could say which of them was meant. Admitting either would give one
+     * organisation the other's streams, schema and checkpoints - and would report nothing, because each
+     * token is valid and each request is authorised.
+     *
+     * @param candidates Entries that survived the per-entry checks.
+     *
+     * @return The subset whose realm names are unique.
+     */
+    private Map<String, TenantId> withoutAmbiguousRealms(final Map<String, TenantId> candidates) {
+
+        final Map<TenantId, List<String>> issuersPerRealm = new LinkedHashMap<>();
+        candidates.forEach((issuerUri, tenantId) ->
+                issuersPerRealm.computeIfAbsent(tenantId, id -> new ArrayList<>()).add(issuerUri));
+
+        final Map<String, TenantId> result = new LinkedHashMap<>();
+        issuersPerRealm.forEach((tenantId, issuers) -> {
+            if (issuers.size() > 1) {
+                LOG.error("Realm '{}' is registered for more than one issuer ({}) - none of them is "
+                        + "admitted. A resource server derives the tenant from the realm name alone, so "
+                        + "these would share streams, schema and checkpoints. Give them distinct realm "
+                        + "names in jtenman.", tenantId.name(), String.join(", ", issuers));
+            } else {
+                result.put(issuers.get(0), tenantId);
+            }
+        });
+        return result;
+    }
+
+    /**
+     * Returns what a resource server will read as the tenant: the last path segment of the issuer.
+     *
+     * @param issuerUri Issuer URI of the tenant.
+     *
+     * @return Trailing segment, which is the empty string if the URI ends in a slash.
+     */
+    private static String realmSegmentOf(final String issuerUri) {
+        return issuerUri.substring(issuerUri.lastIndexOf('/') + 1);
     }
 
     private void announce(final Map<String, TenantId> previous, final Map<String, TenantId> current) {

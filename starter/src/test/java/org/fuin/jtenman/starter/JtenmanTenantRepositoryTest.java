@@ -201,6 +201,87 @@ class JtenmanTenantRepositoryTest {
         assertThat(testee.findByIssuer(BASE + "globex")).isPresent();
     }
 
+    /**
+     * A resource server reads the tenant off the issuer's last segment, so a realm named anything else is
+     * one tenant under two identifiers. The half that would be silent is the event store: streams written
+     * under the issuer's segment, projected under jtenman's realm name, and a read model that stays empty
+     * while everything reports fine.
+     */
+    @Test
+    void testARealmThatIsNotItsIssuersLastSegmentIsNotAdmitted() {
+
+        final Testee testee = testee(List.of(
+                details("acme", BASE + "acme", TenantStatus.ACTIVE),
+                details("globex", BASE + "globex-eu", TenantStatus.ACTIVE)));
+        testee.refresh();
+
+        assertThat(testee.getTenantIds()).containsExactly(new TenantId("acme"));
+        assertThat(testee.findByIssuer(BASE + "globex-eu")).isEmpty();
+        // Not merely unadmitted - never even asked about, so a bad row costs no discovery call either.
+        assertThat(testee.resolved).containsExactly(BASE + "acme");
+        assertThat(testee.added()).containsExactly(new TenantId("acme"));
+    }
+
+    /**
+     * The same realm name on two Keycloaks is two organisations and one {@link TenantId}. Both are
+     * dropped: nothing here can say which was meant, and admitting either hands one of them the other's
+     * streams, schema and checkpoints.
+     */
+    @Test
+    void testARealmClaimedByTwoIssuersIsNotAdmittedAtAll() {
+
+        final Testee testee = testee(List.of(
+                details("acme", "http://kc-eu:8180/realms/acme", TenantStatus.ACTIVE),
+                details("acme", "http://kc-us:8180/realms/acme", TenantStatus.ACTIVE),
+                details("globex", BASE + "globex", TenantStatus.ACTIVE)));
+        testee.refresh();
+
+        assertThat(testee.getTenantIds()).containsExactly(new TenantId("globex"));
+        assertThat(testee.findByIssuer("http://kc-eu:8180/realms/acme")).isEmpty();
+        assertThat(testee.findByIssuer("http://kc-us:8180/realms/acme")).isEmpty();
+        assertThat(testee.added()).containsExactly(new TenantId("globex"));
+    }
+
+    /**
+     * The collision can appear after the fact, and then it is an eviction: the tenant that was being
+     * served has to stop being served, and the listeners only drop their caches on the event.
+     */
+    @Test
+    void testATenantThatBecomesAmbiguousIsWithdrawn() {
+
+        final Testee testee = testee(List.of(details("acme", BASE + "acme", TenantStatus.ACTIVE)));
+        testee.refresh();
+        testee.events.clear();
+
+        testee.answer.set(List.of(
+                details("acme", BASE + "acme", TenantStatus.ACTIVE),
+                details("acme", "http://kc-us:8180/realms/acme", TenantStatus.ACTIVE)));
+        testee.refresh();
+
+        assertThat(testee.getTenantIds()).isEmpty();
+        assertThat(testee.findByIssuer(BASE + "acme")).isEmpty();
+        assertThat(testee.removed()).containsExactly(new TenantId("acme"));
+    }
+
+    /**
+     * A bad row must not take the answerable tenants down with it, which is why these are dropped
+     * entries rather than a failed pull - a failed pull means "could not ask jtenman" and eventually
+     * stops the application serving anybody.
+     */
+    @Test
+    void testAnInadmissibleEntryDoesNotFailTheRefresh() {
+
+        final Testee testee = testee(List.of(
+                details("acme", BASE + "acme", TenantStatus.ACTIVE),
+                details("globex", BASE + "globex-eu", TenantStatus.ACTIVE)));
+
+        testee.refresh();
+
+        assertThat(testee.usable()).isTrue();
+        assertThat(testee.lastSuccessfulRefresh()).isPresent();
+        assertThat(testee.findByIssuer(BASE + "acme")).isPresent();
+    }
+
     private static Testee testee(final List<TenantDetails> answer) {
         return testee(answer, Duration.ofMinutes(5));
     }
@@ -218,9 +299,14 @@ class JtenmanTenantRepositoryTest {
     }
 
     private static TenantDetails details(final String realm, final TenantStatus status) {
+        return details(realm, BASE + realm, status);
+    }
+
+    private static TenantDetails details(final String realm, final String issuerUri,
+            final TenantStatus status) {
         return new TenantDetails(
                 new VersionedEntityIdPath(new EntityIdPath(new TenantRealmId(realm)), 1),
-                new RealmName(realm), new IssuerUri(BASE + realm), status);
+                new RealmName(realm), new IssuerUri(issuerUri), status);
     }
 
     /**
