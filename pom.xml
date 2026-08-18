@@ -518,10 +518,7 @@
                         a developer uses.
 
                         Both are tied to the same switch as the publish itself, because a module nobody
-                        publishes needs neither - and running them anyway is not merely wasteful: javadoc
-                        fails outright on jtenman-query-server, where jakarta.servlet arrives twice, once
-                        on its own and once inside tomcat-embed-core. That is a real split package, but it
-                        is a property of an application module that no one consumes as a library.
+                        publishes needs neither.
                     -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
